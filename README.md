@@ -2,6 +2,13 @@
 
 A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views from the **YouTube Analytics API**, builds cumulative view charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
 
+<img width="1738" height="1185" alt="image" src="https://github.com/user-attachments/assets/c70e1716-e114-4bad-bc1f-a6392c39c069" />
+
+<img width="1145" height="757" alt="image" src="https://github.com/user-attachments/assets/eb763fd2-9bf0-4c51-84fa-03bc2387d5b0" />
+
+<img width="1505" height="1115" alt="image" src="https://github.com/user-attachments/assets/cd202122-970e-4d12-8f8b-d82886e0eca4" />
+
+
 ## Features
 
 - Cumulative views line chart for each video (no fills)
