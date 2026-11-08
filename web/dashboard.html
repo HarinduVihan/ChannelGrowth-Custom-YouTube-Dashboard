@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Channel Growth Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>window.DASHBOARD_STATIC = false;</script>
 <style>
   :root {
     --bg: #0f1115;
@@ -250,6 +251,8 @@ let totalChart = null;
 let dailyChart = null;
 let subsChart = null;
 let subsDailyChart = null;
+const STATIC = !!window.DASHBOARD_STATIC;
+let rawCache = null;
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Number(n).toLocaleString();
@@ -266,6 +269,196 @@ const fmtMetric = (n, unit) => {
   return fmt(num);
 };
 
+function staticCounts(videos) {
+  const counts = { all: videos.length, video: 0, shorts: 0, unknown: 0 };
+  videos.forEach((v) => {
+    if (v.type === "shorts") counts.shorts += 1;
+    else if (v.type === "videoOnDemand") counts.video += 1;
+    else counts.unknown += 1;
+  });
+  return counts;
+}
+
+function staticBounds(raw, selected, start, end) {
+  const dates = raw.dates;
+  let first = -1;
+  let last = -1;
+  selected.forEach((v) => {
+    for (let i = 0; i < dates.length; i++) {
+      if (v.views[i] || v.minutes[i]) {
+        if (first < 0 || i < first) first = i;
+        if (i > last) last = i;
+      }
+    }
+  });
+  if (first < 0) return { si: 0, ei: -1 };
+  let si = first;
+  if (start) {
+    const pos = dates.findIndex((d) => d >= start);
+    si = pos < 0 ? last : Math.max(pos, first);
+  }
+  let ei = last;
+  if (end) {
+    let pos = dates.length - 1;
+    while (pos >= 0 && dates[pos] > end) pos -= 1;
+    ei = Math.min(pos, last);
+  }
+  if (ei < si) {
+    si = first;
+    ei = last;
+  }
+  return { si, ei };
+}
+
+function buildStaticSubscribers(raw, fullDates, si, ei) {
+  const s = raw.subscribers || {};
+  const current = s.current != null ? s.current : null;
+  const empty = {
+    dates: [], total: [], gained: [], lost: [], net: [],
+    current, netChange: 0, gainedTotal: 0, lostTotal: 0,
+    anchored: current !== null, updated: s.updated || null,
+  };
+  if (!fullDates.length || si > ei) return empty;
+  const total = (s.total || []).slice(si, ei + 1);
+  const gained = (s.gained || []).slice(si, ei + 1);
+  const lost = (s.lost || []).slice(si, ei + 1);
+  const net = gained.map((g, i) => g - lost[i]);
+  const gainedTotal = gained.reduce((a, b) => a + b, 0);
+  const lostTotal = lost.reduce((a, b) => a + b, 0);
+  return {
+    dates: fullDates, total, gained, lost, net,
+    current, netChange: gainedTotal - lostTotal, gainedTotal, lostTotal,
+    anchored: current !== null, updated: s.updated || null,
+  };
+}
+
+function buildStaticResponse(raw, params) {
+  const metric = params.metric === "watch" ? "watch" : "views";
+  const unit = metric === "watch" ? "hours" : "views";
+  const kind = ["all", "video", "shorts"].includes(params.type) ? params.type : "all";
+  const top = Math.max(1, Math.min(parseInt(params.top, 10) || 10, 40));
+  const videos = raw.videos || [];
+
+  let selected = videos;
+  if (kind === "video") selected = videos.filter((v) => v.type === "videoOnDemand");
+  else if (kind === "shorts") selected = videos.filter((v) => v.type === "shorts");
+
+  const { si, ei } = staticBounds(raw, selected, params.start, params.end);
+  const fullDates = [];
+  if (si <= ei) for (let i = si; i <= ei; i++) fullDates.push(raw.dates[i]);
+
+  const conv = (x) =>
+    metric === "watch" ? Math.round((x / 60) * 100) / 100 : Math.round(x);
+  const cumulative = (vids) => {
+    let run = 0;
+    const arr = [];
+    for (let i = si; i <= ei; i++) {
+      for (const v of vids) {
+        run += metric === "watch" ? v.minutes[i] : v.views[i];
+      }
+      arr.push(conv(run));
+    }
+    return arr;
+  };
+
+  const ranked = selected.map((v) => ({ v, data: cumulative([v]) }));
+  ranked.sort(
+    (a, b) =>
+      (b.data.length ? b.data[b.data.length - 1] : 0) -
+      (a.data.length ? a.data[a.data.length - 1] : 0)
+  );
+
+  const chosen = ranked.slice(0, top);
+  const rest = ranked.slice(top);
+  const series = chosen.map(({ v, data }) => ({
+    label: v.title,
+    videoId: v.id,
+    type: v.type,
+    data,
+    total: data.length ? data[data.length - 1] : 0,
+    other: false,
+  }));
+
+  if (rest.length) {
+    const data = cumulative(rest.map((r) => r.v));
+    series.push({
+      label: "Other (" + rest.length + " videos)",
+      videoId: "",
+      type: "",
+      data,
+      total: data.length ? data[data.length - 1] : 0,
+      other: true,
+    });
+  }
+
+  let rawTotal = 0;
+  if (si <= ei) {
+    for (let i = si; i <= ei; i++) {
+      for (const v of selected) {
+        rawTotal += metric === "watch" ? v.minutes[i] : v.views[i];
+      }
+    }
+  }
+
+  return {
+    dates: fullDates,
+    series,
+    total: conv(rawTotal),
+    videoCount: selected.length,
+    counts: staticCounts(videos),
+    updated: raw.updated,
+    source: "static",
+    videoSource: raw.videoSource || "cache",
+    filter: kind,
+    metric,
+    unit,
+    subscribers: buildStaticSubscribers(raw, fullDates, si, ei),
+  };
+}
+
+function csvEscape(value) {
+  const s = String(value);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function buildStaticCsv(raw, start, end, kind) {
+  const videos = raw.videos || [];
+  let selected = videos;
+  if (kind === "video") selected = videos.filter((v) => v.type === "videoOnDemand");
+  else if (kind === "shorts") selected = videos.filter((v) => v.type === "shorts");
+  const { si, ei } = staticBounds(raw, selected, start, end);
+  const rows = [];
+  if (si <= ei) {
+    const totals = selected
+      .map((v) => {
+        let t = 0;
+        for (let i = si; i <= ei; i++) t += v.views[i];
+        return { v, t };
+      })
+      .sort((a, b) => b.t - a.t);
+    for (const { v } of totals) {
+      for (let i = si; i <= ei; i++) {
+        if (v.views[i] || v.minutes[i]) {
+          rows.push([raw.dates[i], v.id, v.title, v.type, v.views[i], v.minutes[i]]);
+        }
+      }
+    }
+  }
+  const lines = ["Date,Video ID,Video title,Type,Views,Minutes"];
+  for (const r of rows) lines.push(r.map(csvEscape).join(","));
+  return lines.join("\n");
+}
+
+async function loadRaw(forceReload) {
+  if (!rawCache || forceReload) {
+    const url = "data.json" + (forceReload ? "?v=" + Date.now() : "");
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not load data.json");
+    rawCache = await res.json();
+  }
+  return rawCache;
+}
+
 function setStatus(msg, isErr) {
   const el = $("status");
   el.textContent = msg;
@@ -274,20 +467,41 @@ function setStatus(msg, isErr) {
 
 async function loadData(forceRefresh) {
   $("refresh").disabled = true;
-  setStatus(forceRefresh ? "Fetching from YouTube (may take a minute)..." : "Loading...");
-  const params = new URLSearchParams();
-  if (forceRefresh) params.set("refresh", "1");
-  params.set("start", $("start").value || "");
-  params.set("end", $("end").value || "");
-  params.set("top", $("top").value);
-  params.set("type", $("type").value);
-  params.set("metric", $("metric").value);
+  if (forceRefresh) {
+    setStatus(STATIC ? "Reloading snapshot..." : "Fetching from YouTube (may take a minute)...");
+  } else {
+    setStatus("Loading...");
+  }
+  const params = {
+    start: $("start").value || "",
+    end: $("end").value || "",
+    top: $("top").value,
+    type: $("type").value,
+    metric: $("metric").value,
+  };
   try {
-    const res = await fetch("/api/data?" + params.toString());
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    let data;
+    if (STATIC) {
+      const raw = await loadRaw(forceRefresh);
+      data = buildStaticResponse(raw, params);
+    } else {
+      const q = new URLSearchParams();
+      if (forceRefresh) q.set("refresh", "1");
+      q.set("start", params.start);
+      q.set("end", params.end);
+      q.set("top", params.top);
+      q.set("type", params.type);
+      q.set("metric", params.metric);
+      const res = await fetch("/api/data?" + q.toString());
+      data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+    }
     render(data);
-    setStatus(data.source === "live" ? "Live data loaded" : "Showing cached data");
+    if (STATIC) {
+      setStatus("Showing snapshot from " + new Date(data.updated).toLocaleString());
+    } else {
+      setStatus(data.source === "live" ? "Live data loaded" : "Showing cached data");
+    }
   } catch (err) {
     setStatus("Error: " + err.message, true);
   } finally {
@@ -526,17 +740,41 @@ function downloadChart(name, baseName) {
   a.remove();
 }
 
-$("downloadCsv").addEventListener("click", () => {
-  const params = new URLSearchParams();
-  params.set("start", $("start").value || "");
-  params.set("end", $("end").value || "");
-  params.set("type", $("type").value);
-  const a = document.createElement("a");
-  a.href = "/api/export.csv?" + params.toString();
-  a.download = "";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+if (STATIC) $("refresh").textContent = "Reload snapshot";
+$("downloadCsv").addEventListener("click", async () => {
+  if (!STATIC) {
+    const params = new URLSearchParams();
+    params.set("start", $("start").value || "");
+    params.set("end", $("end").value || "");
+    params.set("type", $("type").value);
+    const a = document.createElement("a");
+    a.href = "/api/export.csv?" + params.toString();
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
+  try {
+    const raw = await loadRaw(false);
+    const startVal = $("start").value;
+    const endVal = $("end").value;
+    const start = startVal || raw.dates[0];
+    const end = endVal || raw.dates[raw.dates.length - 1];
+    const kind = $("type").value;
+    const csv = buildStaticCsv(raw, startVal, endVal, kind);
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `youtube_dashboard_${start}_to_${end}_${kind}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setStatus("Error: " + err.message, true);
+  }
 });
 document.querySelectorAll("button[data-chart]").forEach((btn) => {
   btn.addEventListener("click", () => downloadChart(btn.dataset.chart, btn.dataset.name));

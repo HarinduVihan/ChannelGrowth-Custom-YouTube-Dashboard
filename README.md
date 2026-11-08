@@ -45,6 +45,7 @@ In short: the project turns a fragmented and restrictive API surface into a cach
 - **Download PNG** of any chart from the dashboard
 - Exports PNG charts and CSV data from the CLI
 - Optional Matplotlib charts for offline use
+- Static GitHub Pages build with daily scheduled data updates
 
 <img width="1485" height="1238" alt="image" src="https://github.com/user-attachments/assets/3c794cf6-3a58-4906-b2ba-c920fcefd793" />
 
@@ -118,26 +119,64 @@ python scripts/plot_growth.py
 python scripts/plot_growth.py "path/to/Totals.csv" --show
 ```
 
+## Hosting on GitHub Pages
+
+The dashboard can be published as a static site. A GitHub Actions workflow (`.github/workflows/pages.yml`) runs daily, fetches the latest data, builds `dist/`, and deploys it to GitHub Pages.
+
+### One-time setup
+
+1. **Publish the OAuth app.** In Google Cloud Console → OAuth consent screen, set the publishing status to **In production**. Refresh tokens issued while the app is in *Testing* expire after about 7 days, which would break scheduled updates.
+2. **Add repository secrets.** In GitHub → Settings → Secrets and variables → Actions, add:
+   - `GOOGLE_CLIENT_SECRET` — contents of `secrets/client_secret.json`
+   - `GOOGLE_TOKEN` — contents of `secrets/token.json` after the first local sign-in
+3. **Enable Pages.** Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+4. **Run the workflow.** Actions → *Update and deploy dashboard* → *Run workflow*. When it finishes, the site is available at `https://<username>.github.io/<repo>/`.
+
+The workflow also runs daily at 03:00 UTC and on pushes to `main`, `master`, or `branch2`. Scheduled workflows are disabled after 60 days of repository inactivity.
+
+### Privacy note
+
+GitHub Pages sites are public on free and Pro plans; private Pages requires GitHub Enterprise. If you need access control, deploy the generated `dist/` folder to Cloudflare Pages and put **Cloudflare Access** in front of it.
+
+### Build the static site locally
+
+```bash
+python scripts/per_video_growth.py
+python scripts/build_static.py
+```
+
+Then open `dist/index.html`, or serve the folder:
+
+```bash
+python -m http.server 8080 --directory dist
+```
+
+The static build writes `dist/data.json` and a copy of the dashboard that loads it and applies the date, content, metric, and Top-N filters in the browser.
+
 ## Project structure
 
 ```text
 .
+├── .github/
+│   └── workflows/pages.yml    # scheduled fetch + GitHub Pages deploy
 ├── scripts/
 │   ├── dashboard_server.py    # local web server + API endpoint
 │   ├── per_video_growth.py    # API fetching + per-video charts
+│   ├── build_static.py        # builds dist/ for GitHub Pages
 │   └── plot_growth.py         # channel-total cumulative chart
 ├── web/
-│   └── dashboard.html         # dashboard UI (Chart.js)
+│   └── dashboard.html         # dashboard UI (Chart.js, local + static)
 ├── data/
 │   ├── raw/                   # YouTube Studio CSV export (local only)
-│   └── generated/             # derived CSVs (local only)
+│   └── generated/             # derived CSVs + subscribers.json (local only)
 ├── output/                    # generated PNG charts (local only)
+├── dist/                      # generated static site (local only)
 ├── secrets/                   # OAuth credentials (local only)
 ├── requirements.txt
 └── .gitignore
 ```
 
-`secrets/`, `data/`, and `output/` are git-ignored because they contain credentials and personal channel data.
+`secrets/`, `data/`, `output/`, and `dist/` are git-ignored because they contain credentials, personal channel data, or generated output.
 
 ## Data notes
 

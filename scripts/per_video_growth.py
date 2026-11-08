@@ -242,6 +242,7 @@ def main():
     per_video = defaultdict(dict)
     per_minutes = defaultdict(dict)
     all_dates = set()
+    video_source = "cache"
     if args.reuse and daily_csv.exists():
         print(f"Reusing {daily_csv.name} ...")
         with daily_csv.open(newline="", encoding="utf-8") as f:
@@ -258,12 +259,14 @@ def main():
                 types[vid] = row.get("Type") or "unknown"
     else:
         analytics, yt = get_services(client_secret, token_path)
+        video_source = "data-api"
         try:
             videos = list_uploads(yt)
             print(f"Found {len(videos)} uploads (including Shorts) via YouTube Data API.")
         except Exception as e:
             print(f"YouTube Data API unavailable ({e}).")
             print("Falling back to Table data.csv (long-form only).")
+            video_source = "csv"
             if not videos_path or not videos_path.exists():
                 die("Could not find 'Table data.csv'. Pass it with --titles.")
             videos = load_videos(videos_path)
@@ -305,6 +308,16 @@ def main():
             print(f"Could not fetch subscriber data: {e}")
     else:
         print(f"No {subs_json.name}; run without --reuse to fetch subscribers.")
+
+    (out_dir / "fetch_meta.json").write_text(
+        json.dumps(
+            {
+                "videoSource": video_source,
+                "updated": datetime.now().isoformat(timespec="seconds"),
+            }
+        ),
+        encoding="utf-8",
+    )
 
     if not all_dates:
         die("No data returned. Check the date range or channel authorization.")
