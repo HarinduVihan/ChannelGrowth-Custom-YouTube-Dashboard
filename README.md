@@ -2,13 +2,6 @@
 
 A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
 
-<img width="1738" height="1185" alt="image" src="https://github.com/user-attachments/assets/c70e1716-e114-4bad-bc1f-a6392c39c069" />
-
-<img width="1145" height="757" alt="image" src="https://github.com/user-attachments/assets/eb763fd2-9bf0-4c51-84fa-03bc2387d5b0" />
-
-<img width="1505" height="1115" alt="image" src="https://github.com/user-attachments/assets/cd202122-970e-4d12-8f8b-d82886e0eca4" />
-
-
 ## Problem Statement
 
 YouTube Studio shows aggregate channel numbers, but it does not clearly answer **what is driving growth over time**. This project was built to answer questions like:
@@ -18,7 +11,7 @@ YouTube Studio shows aggregate channel numbers, but it does not clearly answer *
 - How is the channel's subscriber count growing, and when do spikes happen?
 - Can all of this be explored locally, with filters and live data?
 
-### Why this is harder than it looks
+### The obstacle faced
 
 - The Analytics API rejects `dimensions=day,video`, and `dimensions=video` alone. Per-video data only works by querying **one video at a time** with `filters=video==<id>` and `dimensions=day,creatorContentType`.
 - `creatorContentType` is what makes it possible to classify each video as `shorts` or `videoOnDemand`.
@@ -52,6 +45,13 @@ In short: the project turns a fragmented and restrictive API surface into a cach
 - **Download PNG** of any chart from the dashboard
 - Exports PNG charts and CSV data from the CLI
 - Optional Matplotlib charts for offline use
+
+<img width="1482" height="1239" alt="image" src="https://github.com/user-attachments/assets/d1b1c0c5-491d-4c13-aeac-74c6ad4d56af" />
+
+<img width="1472" height="1228" alt="image" src="https://github.com/user-attachments/assets/423d1b1f-e437-4710-80d6-675d96e13e6e" />
+
+<img width="1155" height="1118" alt="image" src="https://github.com/user-attachments/assets/0635ca58-92bd-497a-9305-6df2c9e2fc5a" />
+
 
 ## Requirements
 
