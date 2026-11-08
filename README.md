@@ -16,6 +16,9 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 - Daily activity bar chart
 - Switch the metric between **Views** and **Watch time (hours)**
 - Filter by content type: All, Videos, Shorts
+- **Subscribers** KPI with current total and net change in the selected range
+- **Subscriber total** line chart (reconstructed from daily gains/losses)
+- **Subscribers gained / lost per day** bar chart
 - Date-range and Top-N controls
 - Live refresh from the YouTube Analytics API (cached locally)
 - Exports PNG charts and CSV data
@@ -113,6 +116,8 @@ python scripts/plot_growth.py "path/to/Totals.csv" --show
 - Views and watch time are fetched in a single call using `metrics=views,estimatedMinutesWatched`.
 - Watch time is displayed in **hours** (`estimatedMinutesWatched / 60`), which matches YouTube Studio's **Watch time (hours)**.
 - Daily activity is attributed per video using `creatorContentType` (`shorts` or `videoOnDemand`).
+- Subscribers come from `subscribersGained` / `subscribersLost` per day. The absolute total is anchored to the current `subscriberCount` from the YouTube Data API, so history is reconstructed backwards.
+- Subscriber data is channel-level only; the API cannot attribute subscribers to individual videos.
 - Video titles and the offline fallback list come from the Studio export (`Table data.csv`) in `data/raw/`.
 - If the YouTube Data API is not enabled, the dashboard falls back to long-form videos only and shows a notice.
 
