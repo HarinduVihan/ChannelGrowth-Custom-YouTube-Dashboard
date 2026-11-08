@@ -1,6 +1,7 @@
 import csv
 import json
 import sys
+from io import StringIO
 import threading
 import webbrowser
 from collections import defaultdict
@@ -289,6 +290,54 @@ def build_response(start, end, top, kind, metric="views"):
     return base_resp
 
 
+def build_export(start, end, kind):
+    per_video = STATE["per_video"] or {}
+    per_minutes = STATE.get("per_minutes") or {}
+    titles = STATE["titles"]
+    types = STATE.get("types") or {}
+
+    if kind == "video":
+        ids = [v for v in per_video if types.get(v) == "videoOnDemand"]
+    elif kind == "shorts":
+        ids = [v for v in per_video if types.get(v) == "shorts"]
+    else:
+        ids = list(per_video)
+
+    all_dates = sorted({d for vid in ids for d in per_video[vid]})
+    if not all_dates:
+        return []
+    sdate = datetime.strptime(start, "%Y-%m-%d").date() if start else all_dates[0]
+    edate = datetime.strptime(end, "%Y-%m-%d").date() if end else all_dates[-1]
+    sdate = max(sdate, all_dates[0])
+    edate = min(edate, all_dates[-1])
+    if edate < sdate:
+        sdate, edate = all_dates[0], all_dates[-1]
+
+    totals = {}
+    for vid in ids:
+        totals[vid] = sum(
+            views for d, views in per_video[vid].items() if sdate <= d <= edate
+        )
+    ranked = sorted(ids, key=lambda v: totals[v], reverse=True)
+
+    rows = []
+    for vid in ranked:
+        minutes = per_minutes.get(vid, {})
+        for d in sorted(per_video[vid]):
+            if sdate <= d <= edate:
+                rows.append(
+                    [
+                        d.isoformat(),
+                        vid,
+                        titles.get(vid, vid),
+                        types.get(vid, "unknown"),
+                        per_video[vid][d],
+                        minutes.get(d, 0.0),
+                    ]
+                )
+    return rows
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
@@ -341,6 +390,32 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(payload)
             except Exception as e:
                 self.send_json({"error": str(e)}, status=500)
+            return
+        if parsed.path == "/api/export.csv":
+            qs = parse_qs(parsed.query)
+            get = lambda k, d="": qs.get(k, [d])[0]
+            start, end = get("start"), get("end")
+            kind = get("type", "all")
+            if kind not in ("all", "video", "shorts"):
+                kind = "all"
+            rows = build_export(start, end, kind)
+            buf = StringIO()
+            w = csv.writer(buf)
+            w.writerow(["Date", "Video ID", "Video title", "Type", "Views", "Minutes"])
+            w.writerows(rows)
+            body = buf.getvalue().encode("utf-8-sig")
+            dates = sorted({r[0] for r in rows})
+            sdate = start or (dates[0] if dates else "start")
+            edate = end or (dates[-1] if dates else "end")
+            filename = f"youtube_dashboard_{sdate}_to_{edate}_{kind}.csv"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header(
+                "Content-Disposition", f'attachment; filename="{filename}"'
+            )
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         self.send_response(404)
         self.end_headers()

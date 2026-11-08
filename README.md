@@ -1,6 +1,6 @@
 # Custom YouTube Dashboard
 
-A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views from the **YouTube Analytics API**, builds cumulative view charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
+A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
 
 <img width="1738" height="1185" alt="image" src="https://github.com/user-attachments/assets/c70e1716-e114-4bad-bc1f-a6392c39c069" />
 
@@ -8,6 +8,33 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 
 <img width="1505" height="1115" alt="image" src="https://github.com/user-attachments/assets/cd202122-970e-4d12-8f8b-d82886e0eca4" />
 
+
+## Problem Statement
+
+YouTube Studio shows aggregate channel numbers, but it does not clearly answer **what is driving growth over time**. This project was built to answer questions like:
+
+- Which individual videos contribute most to cumulative views and watch time?
+- Are **Shorts** or **long-form videos** driving growth?
+- How is the channel's subscriber count growing, and when do spikes happen?
+- Can all of this be explored locally, with filters and live data?
+
+### Why this is harder than it looks
+
+- The Analytics API rejects `dimensions=day,video`, and `dimensions=video` alone. Per-video data only works by querying **one video at a time** with `filters=video==<id>` and `dimensions=day,creatorContentType`.
+- `creatorContentType` is what makes it possible to classify each video as `shorts` or `videoOnDemand`.
+- Enumerating uploads **including Shorts** requires the **YouTube Data API v3**. Without it, the fallback is the Studio `Table data.csv`, which only contains long-form videos.
+- The Analytics API lags about **2 days**, so recent data is always slightly behind.
+- "Watch time" is Google's `estimatedMinutesWatched` (the same value as Studio's *Watch time hours*); it is converted to hours for display.
+- The API has **no historical subscriber total** — only `subscribersGained` and `subscribersLost` per day. The subscriber curve must therefore be reconstructed backwards and anchored to the current `subscriberCount` from the Data API.
+
+## How We Solved It
+
+1. **Fetch layer** (`scripts/per_video_growth.py`) — walks every upload, fetches daily views, watch minutes, and content type in a single call per video, and fetches subscriber gains/losses in date chunks (avoiding the API's broken `startIndex` pagination). Results are cached locally.
+2. **Server layer** (`scripts/dashboard_server.py`) — seeds from the cache, serves JSON, and can refresh live. Handles date range, content type, metric, and Top-N filters, plus subscriber aggregation.
+3. **UI layer** (`web/dashboard.html`) — a local web dashboard with a Views/Watch time toggle, All/Videos/Shorts filter, Top-N ranking, and a dedicated subscriber section (current KPI, reconstructed total line, daily gained/lost bars).
+4. **Reliability** — cache-based startup keeps the dashboard instant, refresh is optional, long-form fallback works without the Data API, and credentials/personal data stay out of Git.
+
+In short: the project turns a fragmented and restrictive API surface into a cached, queryable dataset and a dashboard that explains **which videos and content types actually drive views, watch time, and subscriber growth over time** — not just a single total number.
 
 ## Features
 
@@ -21,7 +48,9 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 - **Subscribers gained / lost per day** bar chart
 - Date-range and Top-N controls
 - Live refresh from the YouTube Analytics API (cached locally)
-- Exports PNG charts and CSV data
+- **Download CSV** of the current filtered dataset from the dashboard
+- **Download PNG** of any chart from the dashboard
+- Exports PNG charts and CSV data from the CLI
 - Optional Matplotlib charts for offline use
 
 ## Requirements
@@ -66,7 +95,7 @@ This opens <http://127.0.0.1:8000>. Pass a port to change it:
 python scripts/dashboard_server.py 8080
 ```
 
-On first load it uses cached data from `data/generated/`. Click **Refresh from YouTube** to fetch the latest data (may take about a minute).
+On first load it uses cached data from `data/generated/`. Click **Refresh from YouTube** to fetch the latest data (may take about a minute). Use **Download CSV** to export the currently filtered data, and the **PNG** button on any chart to save it as an image.
 
 ### Per-video charts (Matplotlib)
 

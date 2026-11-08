@@ -87,6 +87,21 @@
   }
   button:hover { opacity: .88; }
   button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--accent); opacity: 1; }
+  .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .chart-head .chart-title { margin: 0; }
+  .mini {
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mini:hover { color: var(--text); border-color: var(--accent); opacity: 1; }
   .status { color: var(--muted); font-size: 13px; margin-left: auto; }
   .status.err { color: #ff6b6b; }
   .notice {
@@ -172,6 +187,7 @@
       </select>
     </div>
     <button id="refresh">Refresh from YouTube</button>
+    <button id="downloadCsv" class="secondary">Download CSV</button>
     <div class="status" id="status">Loading...</div>
   </div>
   <div class="notice" id="notice" style="display:none"></div>
@@ -179,23 +195,38 @@
   <div class="grid">
     <div class="main-col">
       <div class="chart-card">
-        <h2 class="chart-title" id="chartTitle">Cumulative views per video</h2>
+        <div class="chart-head">
+          <h2 class="chart-title" id="chartTitle">Cumulative views per video</h2>
+          <button class="mini" data-chart="chart" data-name="views-by-video">PNG</button>
+        </div>
         <div class="chart-holder"><canvas id="chart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title" id="totalTitle">Channel total cumulative views</h2>
+        <div class="chart-head">
+          <h2 class="chart-title" id="totalTitle">Channel total cumulative views</h2>
+          <button class="mini" data-chart="totalChart" data-name="channel-total">PNG</button>
+        </div>
         <div class="chart-holder small"><canvas id="totalChart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title" id="dailyTitle">Daily views (all videos)</h2>
+        <div class="chart-head">
+          <h2 class="chart-title" id="dailyTitle">Daily views (all videos)</h2>
+          <button class="mini" data-chart="dailyChart" data-name="daily-activity">PNG</button>
+        </div>
         <div class="chart-holder small"><canvas id="dailyChart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title" id="subsTitle">Subscriber total</h2>
+        <div class="chart-head">
+          <h2 class="chart-title" id="subsTitle">Subscriber total</h2>
+          <button class="mini" data-chart="subsChart" data-name="subscriber-total">PNG</button>
+        </div>
         <div class="chart-holder small"><canvas id="subsChart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Subscribers gained / lost per day</h2>
+        <div class="chart-head">
+          <h2 class="chart-title">Subscribers gained / lost per day</h2>
+          <button class="mini" data-chart="subsDailyChart" data-name="subscribers-daily">PNG</button>
+        </div>
         <div class="chart-holder small"><canvas id="subsDailyChart"></canvas></div>
       </div>
     </div>
@@ -474,6 +505,42 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function downloadChart(name, baseName) {
+  const refs = { chart, totalChart, dailyChart, subsChart, subsDailyChart };
+  const c = refs[name];
+  if (!c) return;
+  const src = c.canvas;
+  const pad = 16;
+  const out = document.createElement("canvas");
+  out.width = src.width + pad * 2;
+  out.height = src.height + pad * 2;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#0f1115";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(src, pad, pad);
+  const a = document.createElement("a");
+  a.href = out.toDataURL("image/png");
+  a.download = baseName + ".png";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+$("downloadCsv").addEventListener("click", () => {
+  const params = new URLSearchParams();
+  params.set("start", $("start").value || "");
+  params.set("end", $("end").value || "");
+  params.set("type", $("type").value);
+  const a = document.createElement("a");
+  a.href = "/api/export.csv?" + params.toString();
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+document.querySelectorAll("button[data-chart]").forEach((btn) => {
+  btn.addEventListener("click", () => downloadChart(btn.dataset.chart, btn.dataset.name));
+});
 $("refresh").addEventListener("click", () => loadData(true));
 $("metric").addEventListener("change", () => loadData(false));
 $("type").addEventListener("change", () => loadData(false));
