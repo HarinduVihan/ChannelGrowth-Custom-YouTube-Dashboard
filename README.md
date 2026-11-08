@@ -46,7 +46,7 @@ In short: the project turns a fragmented and restrictive API surface into a cach
 - Exports PNG charts and CSV data from the CLI
 - Optional Matplotlib charts for offline use
 
-<img width="1482" height="1239" alt="image" src="https://github.com/user-attachments/assets/d1b1c0c5-491d-4c13-aeac-74c6ad4d56af" />
+<img width="1485" height="1238" alt="image" src="https://github.com/user-attachments/assets/3c794cf6-3a58-4906-b2ba-c920fcefd793" />
 
 <img width="1472" height="1228" alt="image" src="https://github.com/user-attachments/assets/423d1b1f-e437-4710-80d6-675d96e13e6e" />
 
