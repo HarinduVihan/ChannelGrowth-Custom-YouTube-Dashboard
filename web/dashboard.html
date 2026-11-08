@@ -133,13 +133,13 @@
 </head>
 <body>
 <header>
-  <h1>Channel Growth <span>&#9654;</span> Cumulative Views</h1>
+  <h1>Channel Growth <span>&#9654;</span> YouTube Analytics</h1>
   <div class="updated" id="updated">Not loaded</div>
 </header>
 
 <div class="wrap">
   <div class="kpis">
-    <div class="card"><div class="label">Total views</div><div class="value" id="kpiTotal">-</div></div>
+    <div class="card"><div class="label" id="kpiTotalLabel">Total views</div><div class="value" id="kpiTotal">-</div></div>
     <div class="card"><div class="label">Videos tracked</div><div class="value" id="kpiVideos">-</div></div>
     <div class="card"><div class="label">Days</div><div class="value" id="kpiDays">-</div></div>
     <div class="card"><div class="label">Data through</div><div class="value" id="kpiEnd">-</div></div>
@@ -148,6 +148,12 @@
   <div class="controls">
     <div class="field"><label>Start</label><input type="date" id="start" /></div>
     <div class="field"><label>End</label><input type="date" id="end" /></div>
+    <div class="field"><label>Metric</label>
+      <select id="metric">
+        <option value="views" selected>Views</option>
+        <option value="watch">Watch time (hours)</option>
+      </select>
+    </div>
     <div class="field"><label>Content</label>
       <select id="type">
         <option value="all" selected>All</option>
@@ -171,20 +177,20 @@
   <div class="grid">
     <div class="main-col">
       <div class="chart-card">
-        <h2 class="chart-title">Cumulative views per video</h2>
+        <h2 class="chart-title" id="chartTitle">Cumulative views per video</h2>
         <div class="chart-holder"><canvas id="chart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Channel total cumulative views</h2>
+        <h2 class="chart-title" id="totalTitle">Channel total cumulative views</h2>
         <div class="chart-holder small"><canvas id="totalChart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Daily views (all videos)</h2>
+        <h2 class="chart-title" id="dailyTitle">Daily views (all videos)</h2>
         <div class="chart-holder small"><canvas id="dailyChart"></canvas></div>
       </div>
     </div>
     <div class="list-card">
-      <h2>Top videos</h2>
+      <h2 id="listTitle">Top videos by views</h2>
       <div id="videoList"><div class="empty">No data</div></div>
     </div>
   </div>
@@ -209,6 +215,13 @@ const compact = (n) => {
   if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
   return String(n);
 };
+const fmtMetric = (n, unit) => {
+  const num = Number(n);
+  if (unit === "hours") {
+    return num.toLocaleString(undefined, { maximumFractionDigits: 1 }) + " h";
+  }
+  return fmt(num);
+};
 
 function setStatus(msg, isErr) {
   const el = $("status");
@@ -225,6 +238,7 @@ async function loadData(forceRefresh) {
   params.set("end", $("end").value || "");
   params.set("top", $("top").value);
   params.set("type", $("type").value);
+  params.set("metric", $("metric").value);
   try {
     const res = await fetch("/api/data?" + params.toString());
     const data = await res.json();
@@ -239,11 +253,18 @@ async function loadData(forceRefresh) {
 }
 
 function render(data) {
-  $("kpiTotal").textContent = fmt(data.total);
+  const unit = data.unit || "views";
+  const metricLabel = unit === "hours" ? "watch time" : "views";
+  $("kpiTotalLabel").textContent = "Total " + metricLabel;
+  $("kpiTotal").textContent = fmtMetric(data.total, unit);
   $("kpiVideos").textContent = fmt(data.videoCount);
   $("kpiDays").textContent = fmt(data.dates.length);
   $("kpiEnd").textContent = data.dates.length ? data.dates[data.dates.length - 1] : "-";
   $("updated").textContent = "Last updated: " + new Date(data.updated).toLocaleString();
+  $("chartTitle").textContent = "Cumulative " + metricLabel + " per video";
+  $("totalTitle").textContent = "Channel total cumulative " + metricLabel;
+  $("dailyTitle").textContent = "Daily " + metricLabel + " (all videos)";
+  $("listTitle").textContent = "Top videos by " + metricLabel;
 
   const counts = data.counts || {};
   const setOption = (val, text) => {
@@ -286,7 +307,7 @@ function render(data) {
   chart = new Chart($("chart"), {
     type: "line",
     data: { labels, datasets },
-    options: baseOptions(data.dates, true),
+    options: baseOptions(data.dates, true, unit),
   });
 
   const totalCumulative = data.dates.map((_, i) =>
@@ -300,7 +321,7 @@ function render(data) {
     data: {
       labels,
       datasets: [{
-        label: "Total cumulative views",
+        label: "Total cumulative " + metricLabel,
         data: totalCumulative,
         borderColor: "#ff3b5c",
         backgroundColor: "#ff3b5c",
@@ -311,7 +332,7 @@ function render(data) {
         fill: false,
       }],
     },
-    options: baseOptions(data.dates, false),
+    options: baseOptions(data.dates, false, unit),
   });
 
   if (dailyChart) dailyChart.destroy();
@@ -320,14 +341,14 @@ function render(data) {
     data: {
       labels,
       datasets: [{
-        label: "Views per day",
+        label: metricLabel + " per day",
         data: daily,
         backgroundColor: "rgba(59,160,255,0.7)",
         borderWidth: 0,
         borderRadius: 2,
       }],
     },
-    options: baseOptions(data.dates, false),
+    options: baseOptions(data.dates, false, unit),
   });
 
   const all = data.series.filter((s) => !s.other).slice(0, 10);
@@ -340,13 +361,13 @@ function render(data) {
       : (s.type === "videoOnDemand" ? '<span class="badge video">VIDEO</span>' : "");
     return `<div class="video-item">
       <div class="video-title">${badge}${escapeHtml(s.label)}</div>
-      <div class="video-meta"><span>${s.videoId}</span><span>${fmt(s.total)}</span></div>
+      <div class="video-meta"><span>${s.videoId}</span><span>${fmtMetric(s.total, unit)}</span></div>
       <div class="bar"><div style="width:${w}%;background:${color}"></div></div>
     </div>`;
   }).join("") || '<div class="empty">No data</div>';
 }
 
-function baseOptions(dates, showLegend) {
+function baseOptions(dates, showLegend, unit) {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -360,7 +381,7 @@ function baseOptions(dates, showLegend) {
         callbacks: {
           title: (items) => dates[items[0].dataIndex],
           label: (item) =>
-            (item.dataset.label ? item.dataset.label + ": " : "") + fmt(item.parsed.y),
+            (item.dataset.label ? item.dataset.label + ": " : "") + fmtMetric(item.parsed.y, unit),
         },
       },
     },
@@ -383,6 +404,7 @@ function escapeHtml(s) {
 }
 
 $("refresh").addEventListener("click", () => loadData(true));
+$("metric").addEventListener("change", () => loadData(false));
 $("type").addEventListener("change", () => loadData(false));
 $("top").addEventListener("change", () => loadData(false));
 $("start").addEventListener("change", () => loadData(false));

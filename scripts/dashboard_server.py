@@ -17,6 +17,7 @@ import per_video_growth as pvg
 LIVE_START = "2023-08-07"
 STATE = {
     "per_video": None,
+    "per_minutes": None,
     "titles": {},
     "types": {},
     "updated": None,
@@ -31,6 +32,7 @@ def load_from_csv():
     if not path.exists():
         return False
     per_video = defaultdict(dict)
+    per_minutes = defaultdict(dict)
     titles = {}
     types = {}
     with path.open(newline="", encoding="utf-8") as f:
@@ -38,12 +40,16 @@ def load_from_csv():
             vid = row["Video ID"]
             d = datetime.strptime(row["Date"], "%Y-%m-%d").date()
             per_video[vid][d] = per_video[vid].get(d, 0) + int(row["Views"])
+            per_minutes[vid][d] = per_minutes[vid].get(d, 0.0) + float(
+                row.get("Minutes") or 0
+            )
             titles.setdefault(vid, row["Video title"])
             types[vid] = row.get("Type") or "unknown"
     if not per_video:
         return False
     STATE.update(
         per_video=dict(per_video),
+        per_minutes=dict(per_minutes),
         titles=titles,
         types=types,
         updated=datetime.now().isoformat(timespec="seconds"),
@@ -72,6 +78,7 @@ def fetch_live():
         video_source = "csv"
 
     per_video = defaultdict(dict)
+    per_minutes = defaultdict(dict)
     titles = dict(videos)
     types = {}
     for i, (vid, title) in enumerate(videos, 1):
@@ -82,12 +89,14 @@ def fetch_live():
         except Exception as e:
             print(f"    skipped {vid}: {e}")
             continue
-        for day, ctype, views in rows:
+        for day, ctype, views, minutes in rows:
             d = datetime.strptime(day, "%Y-%m-%d").date()
             per_video[vid][d] = per_video[vid].get(d, 0) + int(views)
+            per_minutes[vid][d] = per_minutes[vid].get(d, 0.0) + float(minutes)
             types[vid] = ctype
     STATE.update(
         per_video=dict(per_video),
+        per_minutes=dict(per_minutes),
         titles=titles,
         types=types,
         updated=datetime.now().isoformat(timespec="seconds"),
@@ -109,8 +118,9 @@ def count_types():
     return counts
 
 
-def build_response(start, end, top, kind):
-    per_video = STATE["per_video"] or {}
+def build_response(start, end, top, kind, metric="views"):
+    source = STATE["per_minutes"] if metric == "watch" else STATE["per_video"]
+    per_video = source or {}
     titles = STATE["titles"]
     types = STATE.get("types") or {}
 
@@ -118,6 +128,11 @@ def build_response(start, end, top, kind):
         per_video = {v: s for v, s in per_video.items() if types.get(v) == "videoOnDemand"}
     elif kind == "shorts":
         per_video = {v: s for v, s in per_video.items() if types.get(v) == "shorts"}
+
+    unit = "hours" if metric == "watch" else "views"
+
+    def conv(x):
+        return round(x / 60.0, 2) if metric == "watch" else int(x)
 
     all_dates = sorted({d for s in per_video.values() for d in s})
     base_resp = {
@@ -130,6 +145,8 @@ def build_response(start, end, top, kind):
         "source": STATE["source"] or "cache",
         "videoSource": STATE["videoSource"] or "cache",
         "filter": kind,
+        "metric": metric,
+        "unit": unit,
     }
     if not all_dates:
         return base_resp
@@ -162,8 +179,8 @@ def build_response(start, end, top, kind):
                 "label": titles.get(vid, vid),
                 "videoId": vid,
                 "type": types.get(vid, "unknown"),
-                "data": cumulative[vid],
-                "total": totals[vid],
+                "data": [conv(x) for x in cumulative[vid]],
+                "total": conv(totals[vid]),
                 "other": False,
             }
         )
@@ -175,8 +192,8 @@ def build_response(start, end, top, kind):
                 "label": f"Other ({len(rest)} videos)",
                 "videoId": "",
                 "type": "",
-                "data": other,
-                "total": sum(totals[v] for v in rest),
+                "data": [conv(x) for x in other],
+                "total": conv(sum(totals[v] for v in rest)),
                 "other": True,
             }
         )
@@ -184,7 +201,7 @@ def build_response(start, end, top, kind):
     base_resp.update(
         dates=[d.isoformat() for d in full],
         series=series,
-        total=sum(totals.values()),
+        total=conv(sum(totals.values())),
         videoCount=len(per_video),
     )
     return base_resp
@@ -225,6 +242,9 @@ class Handler(BaseHTTPRequestHandler):
             kind = get("type", "all")
             if kind not in ("all", "video", "shorts"):
                 kind = "all"
+            metric = get("metric", "views")
+            if metric not in ("views", "watch"):
+                metric = "views"
             try:
                 top = max(1, min(int(get("top", "10") or 10), 40))
             except ValueError:
@@ -235,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
                         print("Fetching live data from YouTube Analytics...")
                         fetch_live()
                         print("Done.")
-                payload = build_response(start, end, top, kind)
+                payload = build_response(start, end, top, kind, metric)
                 self.send_json(payload)
             except Exception as e:
                 self.send_json({"error": str(e)}, status=500)

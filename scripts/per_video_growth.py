@@ -110,7 +110,7 @@ def fetch_video_daily(service, vid, start, end):
                 ids="channel==MINE",
                 startDate=start,
                 endDate=end,
-                metrics="views",
+                metrics="views,estimatedMinutesWatched",
                 dimensions="day,creatorContentType",
                 filters=f"video=={vid}",
                 sort="day",
@@ -174,6 +174,7 @@ def main():
     titles = {}
     types = {}
     per_video = defaultdict(dict)
+    per_minutes = defaultdict(dict)
     all_dates = set()
     if args.reuse and daily_csv.exists():
         print(f"Reusing {daily_csv.name} ...")
@@ -182,6 +183,9 @@ def main():
                 vid = row["Video ID"]
                 d = datetime.strptime(row["Date"], "%Y-%m-%d").date()
                 per_video[vid][d] = per_video[vid].get(d, 0) + int(row["Views"])
+                per_minutes[vid][d] = per_minutes[vid].get(d, 0.0) + float(
+                    row.get("Minutes") or 0
+                )
                 all_dates.add(d)
                 if row.get("Video title"):
                     titles[vid] = row["Video title"]
@@ -205,9 +209,10 @@ def main():
             except Exception as e:
                 print(f"  [{i}/{len(videos)}] skipped {vid}: {e}")
                 continue
-            for day, ctype, views in rows:
+            for day, ctype, views, minutes in rows:
                 d = datetime.strptime(day, "%Y-%m-%d").date()
                 per_video[vid][d] = per_video[vid].get(d, 0) + int(views)
+                per_minutes[vid][d] = per_minutes[vid].get(d, 0.0) + float(minutes)
                 all_dates.add(d)
                 types[vid] = ctype
             safe_title = title.encode("ascii", "replace").decode("ascii")[:50]
@@ -225,7 +230,7 @@ def main():
 
     with daily_csv.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["Date", "Video ID", "Video title", "Type", "Views"])
+        w.writerow(["Date", "Video ID", "Video title", "Type", "Views", "Minutes"])
         for vid in ranked:
             for d in sorted(per_video[vid]):
                 w.writerow(
@@ -235,6 +240,7 @@ def main():
                         titles.get(vid, vid),
                         types.get(vid, "unknown"),
                         per_video[vid][d],
+                        per_minutes[vid].get(d, 0.0),
                     ]
                 )
 

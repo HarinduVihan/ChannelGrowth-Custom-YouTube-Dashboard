@@ -11,9 +11,10 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 
 ## Features
 
-- Cumulative views line chart for each video (no fills)
-- Channel-total cumulative views chart
-- Daily views bar chart
+- Cumulative line chart for each video (no fills)
+- Channel-total cumulative chart
+- Daily activity bar chart
+- Switch the metric between **Views** and **Watch time (hours)**
 - Filter by content type: All, Videos, Shorts
 - Date-range and Top-N controls
 - Live refresh from the YouTube Analytics API (cached locally)
@@ -109,7 +110,9 @@ python scripts/plot_growth.py "path/to/Totals.csv" --show
 ## Data notes
 
 - The YouTube Analytics API typically lags about **2 days**, so the most recent days may be missing.
-- Views are attributed per day and per video using `creatorContentType` (`shorts` or `videoOnDemand`).
+- Views and watch time are fetched in a single call using `metrics=views,estimatedMinutesWatched`.
+- Watch time is displayed in **hours** (`estimatedMinutesWatched / 60`), which matches YouTube Studio's **Watch time (hours)**.
+- Daily activity is attributed per video using `creatorContentType` (`shorts` or `videoOnDemand`).
 - Video titles and the offline fallback list come from the Studio export (`Table data.csv`) in `data/raw/`.
 - If the YouTube Data API is not enabled, the dashboard falls back to long-form videos only and shows a notice.
 
