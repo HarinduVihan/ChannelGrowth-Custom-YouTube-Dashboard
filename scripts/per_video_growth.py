@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import os
 import sys
 from collections import defaultdict
@@ -14,6 +15,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.readonly",
 ]
 PAGE_SIZE = 500
+HISTORY_START = "2023-08-07"
 
 
 def die(msg):
@@ -110,7 +112,7 @@ def fetch_video_daily(service, vid, start, end):
                 ids="channel==MINE",
                 startDate=start,
                 endDate=end,
-                metrics="views",
+                metrics="views,estimatedMinutesWatched",
                 dimensions="day,creatorContentType",
                 filters=f"video=={vid}",
                 sort="day",
@@ -130,6 +132,70 @@ def fetch_video_daily(service, vid, start, end):
             break
         idx += len(chunk)
     return rows
+
+
+def fetch_channel_subscribers(service, start, end):
+    start_d = datetime.strptime(start, "%Y-%m-%d").date()
+    end_d = datetime.strptime(end, "%Y-%m-%d").date()
+    rows = []
+    seen = set()
+    chunk_start = start_d
+    while chunk_start <= end_d:
+        chunk_end = min(chunk_start + timedelta(days=364), end_d)
+        resp = (
+            service.reports()
+            .query(
+                ids="channel==MINE",
+                startDate=chunk_start.isoformat(),
+                endDate=chunk_end.isoformat(),
+                metrics="subscribersGained,subscribersLost",
+                dimensions="day",
+                sort="day",
+                maxResults=1000,
+            )
+            .execute()
+        )
+        for row in resp.get("rows", []):
+            if row[0] not in seen:
+                seen.add(row[0])
+                rows.append(row)
+        chunk_start = chunk_end + timedelta(days=1)
+    rows.sort(key=lambda r: r[0])
+    return rows
+
+
+def fetch_current_subscribers(yt):
+    resp = yt.channels().list(mine=True, part="statistics").execute()
+    items = resp.get("items", [])
+    if not items:
+        return None
+    stats = items[0].get("statistics", {})
+    if stats.get("hiddenSubscriberCount"):
+        return None
+    value = stats.get("subscriberCount")
+    return int(value) if value is not None else None
+
+
+def save_subscribers(path, rows, current):
+    payload = {
+        "updated": datetime.now().isoformat(timespec="seconds"),
+        "current": current,
+        "daily": [
+            {"date": day, "gained": int(gained), "lost": int(lost)}
+            for day, gained, lost in rows
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def load_subscribers(path):
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def find_titles_file(base):
@@ -174,7 +240,9 @@ def main():
     titles = {}
     types = {}
     per_video = defaultdict(dict)
+    per_minutes = defaultdict(dict)
     all_dates = set()
+    video_source = "cache"
     if args.reuse and daily_csv.exists():
         print(f"Reusing {daily_csv.name} ...")
         with daily_csv.open(newline="", encoding="utf-8") as f:
@@ -182,18 +250,23 @@ def main():
                 vid = row["Video ID"]
                 d = datetime.strptime(row["Date"], "%Y-%m-%d").date()
                 per_video[vid][d] = per_video[vid].get(d, 0) + int(row["Views"])
+                per_minutes[vid][d] = per_minutes[vid].get(d, 0.0) + float(
+                    row.get("Minutes") or 0
+                )
                 all_dates.add(d)
                 if row.get("Video title"):
                     titles[vid] = row["Video title"]
                 types[vid] = row.get("Type") or "unknown"
     else:
         analytics, yt = get_services(client_secret, token_path)
+        video_source = "data-api"
         try:
             videos = list_uploads(yt)
             print(f"Found {len(videos)} uploads (including Shorts) via YouTube Data API.")
         except Exception as e:
             print(f"YouTube Data API unavailable ({e}).")
             print("Falling back to Table data.csv (long-form only).")
+            video_source = "csv"
             if not videos_path or not videos_path.exists():
                 die("Could not find 'Table data.csv'. Pass it with --titles.")
             videos = load_videos(videos_path)
@@ -205,13 +278,46 @@ def main():
             except Exception as e:
                 print(f"  [{i}/{len(videos)}] skipped {vid}: {e}")
                 continue
-            for day, ctype, views in rows:
+            for day, ctype, views, minutes in rows:
                 d = datetime.strptime(day, "%Y-%m-%d").date()
                 per_video[vid][d] = per_video[vid].get(d, 0) + int(views)
+                per_minutes[vid][d] = per_minutes[vid].get(d, 0.0) + float(minutes)
                 all_dates.add(d)
                 types[vid] = ctype
             safe_title = title.encode("ascii", "replace").decode("ascii")[:50]
             print(f"  [{i}/{len(videos)}] {len(rows):>5} days  {safe_title}")
+
+    subs_json = out_dir / "subscribers.json"
+    if args.reuse and subs_json.exists():
+        print(f"Reusing {subs_json.name} ...")
+    elif not args.reuse:
+        try:
+            sub_end = datetime.now().strftime("%Y-%m-%d")
+            sub_rows = fetch_channel_subscribers(analytics, HISTORY_START, sub_end)
+            try:
+                current = fetch_current_subscribers(yt)
+            except Exception as e:
+                print(f"Could not read current subscriber count: {e}")
+                current = None
+            save_subscribers(subs_json, sub_rows, current)
+            print(
+                f"Saved {subs_json.name} ({len(sub_rows)} days, "
+                f"current subscribers={current})"
+            )
+        except Exception as e:
+            print(f"Could not fetch subscriber data: {e}")
+    else:
+        print(f"No {subs_json.name}; run without --reuse to fetch subscribers.")
+
+    (out_dir / "fetch_meta.json").write_text(
+        json.dumps(
+            {
+                "videoSource": video_source,
+                "updated": datetime.now().isoformat(timespec="seconds"),
+            }
+        ),
+        encoding="utf-8",
+    )
 
     if not all_dates:
         die("No data returned. Check the date range or channel authorization.")
@@ -225,7 +331,7 @@ def main():
 
     with daily_csv.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["Date", "Video ID", "Video title", "Type", "Views"])
+        w.writerow(["Date", "Video ID", "Video title", "Type", "Views", "Minutes"])
         for vid in ranked:
             for d in sorted(per_video[vid]):
                 w.writerow(
@@ -235,6 +341,7 @@ def main():
                         titles.get(vid, vid),
                         types.get(vid, "unknown"),
                         per_video[vid][d],
+                        per_minutes[vid].get(d, 0.0),
                     ]
                 )
 

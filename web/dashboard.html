@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Channel Growth Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>window.DASHBOARD_STATIC = false;</script>
 <style>
   :root {
     --bg: #0f1115;
@@ -50,6 +51,7 @@
   }
   .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
   .card .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .controls {
     display: flex;
     gap: 12px;
@@ -86,6 +88,21 @@
   }
   button:hover { opacity: .88; }
   button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--accent); opacity: 1; }
+  .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .chart-head .chart-title { margin: 0; }
+  .mini {
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mini:hover { color: var(--text); border-color: var(--accent); opacity: 1; }
   .status { color: var(--muted); font-size: 13px; margin-left: auto; }
   .status.err { color: #ff6b6b; }
   .notice {
@@ -129,25 +146,47 @@
   .bar { height: 5px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .bar > div { height: 100%; border-radius: 4px; }
   .empty { color: var(--muted); font-size: 14px; padding: 20px 0; }
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 18px;
+    margin-top: 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .site-footer a { color: var(--muted); text-decoration: underline; }
+  .site-footer a:hover { color: var(--text); }
 </style>
 </head>
 <body>
 <header>
-  <h1>Channel Growth <span>&#9654;</span> Cumulative Views</h1>
+  <h1>Channel Growth <span>&#9654;</span> YouTube Analytics</h1>
   <div class="updated" id="updated">Not loaded</div>
 </header>
 
 <div class="wrap">
   <div class="kpis">
-    <div class="card"><div class="label">Total views</div><div class="value" id="kpiTotal">-</div></div>
+    <div class="card"><div class="label" id="kpiTotalLabel">Total views</div><div class="value" id="kpiTotal">-</div></div>
     <div class="card"><div class="label">Videos tracked</div><div class="value" id="kpiVideos">-</div></div>
     <div class="card"><div class="label">Days</div><div class="value" id="kpiDays">-</div></div>
     <div class="card"><div class="label">Data through</div><div class="value" id="kpiEnd">-</div></div>
+    <div class="card"><div class="label">Subscribers</div><div class="value" id="kpiSubs">-</div><div class="sub" id="kpiSubsNet"></div></div>
   </div>
 
   <div class="controls">
     <div class="field"><label>Start</label><input type="date" id="start" /></div>
     <div class="field"><label>End</label><input type="date" id="end" /></div>
+    <div class="field"><label>Metric</label>
+      <select id="metric">
+        <option value="views" selected>Views</option>
+        <option value="watch">Watch time (hours)</option>
+      </select>
+    </div>
     <div class="field"><label>Content</label>
       <select id="type">
         <option value="all" selected>All</option>
@@ -164,6 +203,7 @@
       </select>
     </div>
     <button id="refresh">Refresh from YouTube</button>
+    <button id="downloadCsv" class="secondary">Download CSV</button>
     <div class="status" id="status">Loading...</div>
   </div>
   <div class="notice" id="notice" style="display:none"></div>
@@ -171,23 +211,51 @@
   <div class="grid">
     <div class="main-col">
       <div class="chart-card">
-        <h2 class="chart-title">Cumulative views per video</h2>
+        <div class="chart-head">
+          <h2 class="chart-title" id="chartTitle">Cumulative views per video</h2>
+          <button class="mini" data-chart="chart" data-name="views-by-video">PNG</button>
+        </div>
         <div class="chart-holder"><canvas id="chart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Channel total cumulative views</h2>
+        <div class="chart-head">
+          <h2 class="chart-title" id="totalTitle">Channel total cumulative views</h2>
+          <button class="mini" data-chart="totalChart" data-name="channel-total">PNG</button>
+        </div>
         <div class="chart-holder small"><canvas id="totalChart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Daily views (all videos)</h2>
+        <div class="chart-head">
+          <h2 class="chart-title" id="dailyTitle">Daily views (all videos)</h2>
+          <button class="mini" data-chart="dailyChart" data-name="daily-activity">PNG</button>
+        </div>
         <div class="chart-holder small"><canvas id="dailyChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <h2 class="chart-title" id="subsTitle">Subscriber total</h2>
+          <button class="mini" data-chart="subsChart" data-name="subscriber-total">PNG</button>
+        </div>
+        <div class="chart-holder small"><canvas id="subsChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <h2 class="chart-title">Subscribers gained / lost per day</h2>
+          <button class="mini" data-chart="subsDailyChart" data-name="subscribers-daily">PNG</button>
+        </div>
+        <div class="chart-holder small"><canvas id="subsDailyChart"></canvas></div>
       </div>
     </div>
     <div class="list-card">
-      <h2>Top videos</h2>
+      <h2 id="listTitle">Top videos by views</h2>
       <div id="videoList"><div class="empty">No data</div></div>
     </div>
   </div>
+
+  <footer class="site-footer">
+    <span>HV Dashboard &mdash; personal YouTube analytics dashboard for the HVenom channel.</span>
+    <span><a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></span>
+  </footer>
 </div>
 
 <script>
@@ -201,6 +269,10 @@ const OTHER_COLOR = "#4a5160";
 let chart = null;
 let totalChart = null;
 let dailyChart = null;
+let subsChart = null;
+let subsDailyChart = null;
+const STATIC = !!window.DASHBOARD_STATIC;
+let rawCache = null;
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Number(n).toLocaleString();
@@ -209,6 +281,203 @@ const compact = (n) => {
   if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
   return String(n);
 };
+const fmtMetric = (n, unit) => {
+  const num = Number(n);
+  if (unit === "hours") {
+    return num.toLocaleString(undefined, { maximumFractionDigits: 1 }) + " h";
+  }
+  return fmt(num);
+};
+
+function staticCounts(videos) {
+  const counts = { all: videos.length, video: 0, shorts: 0, unknown: 0 };
+  videos.forEach((v) => {
+    if (v.type === "shorts") counts.shorts += 1;
+    else if (v.type === "videoOnDemand") counts.video += 1;
+    else counts.unknown += 1;
+  });
+  return counts;
+}
+
+function staticBounds(raw, selected, start, end) {
+  const dates = raw.dates;
+  let first = -1;
+  let last = -1;
+  selected.forEach((v) => {
+    for (let i = 0; i < dates.length; i++) {
+      if (v.views[i] || v.minutes[i]) {
+        if (first < 0 || i < first) first = i;
+        if (i > last) last = i;
+      }
+    }
+  });
+  if (first < 0) return { si: 0, ei: -1 };
+  let si = first;
+  if (start) {
+    const pos = dates.findIndex((d) => d >= start);
+    si = pos < 0 ? last : Math.max(pos, first);
+  }
+  let ei = last;
+  if (end) {
+    let pos = dates.length - 1;
+    while (pos >= 0 && dates[pos] > end) pos -= 1;
+    ei = Math.min(pos, last);
+  }
+  if (ei < si) {
+    si = first;
+    ei = last;
+  }
+  return { si, ei };
+}
+
+function buildStaticSubscribers(raw, fullDates, si, ei) {
+  const s = raw.subscribers || {};
+  const current = s.current != null ? s.current : null;
+  const empty = {
+    dates: [], total: [], gained: [], lost: [], net: [],
+    current, netChange: 0, gainedTotal: 0, lostTotal: 0,
+    anchored: current !== null, updated: s.updated || null,
+  };
+  if (!fullDates.length || si > ei) return empty;
+  const total = (s.total || []).slice(si, ei + 1);
+  const gained = (s.gained || []).slice(si, ei + 1);
+  const lost = (s.lost || []).slice(si, ei + 1);
+  const net = gained.map((g, i) => g - lost[i]);
+  const gainedTotal = gained.reduce((a, b) => a + b, 0);
+  const lostTotal = lost.reduce((a, b) => a + b, 0);
+  return {
+    dates: fullDates, total, gained, lost, net,
+    current, netChange: gainedTotal - lostTotal, gainedTotal, lostTotal,
+    anchored: current !== null, updated: s.updated || null,
+  };
+}
+
+function buildStaticResponse(raw, params) {
+  const metric = params.metric === "watch" ? "watch" : "views";
+  const unit = metric === "watch" ? "hours" : "views";
+  const kind = ["all", "video", "shorts"].includes(params.type) ? params.type : "all";
+  const top = Math.max(1, Math.min(parseInt(params.top, 10) || 10, 40));
+  const videos = raw.videos || [];
+
+  let selected = videos;
+  if (kind === "video") selected = videos.filter((v) => v.type === "videoOnDemand");
+  else if (kind === "shorts") selected = videos.filter((v) => v.type === "shorts");
+
+  const { si, ei } = staticBounds(raw, selected, params.start, params.end);
+  const fullDates = [];
+  if (si <= ei) for (let i = si; i <= ei; i++) fullDates.push(raw.dates[i]);
+
+  const conv = (x) =>
+    metric === "watch" ? Math.round((x / 60) * 100) / 100 : Math.round(x);
+  const cumulative = (vids) => {
+    let run = 0;
+    const arr = [];
+    for (let i = si; i <= ei; i++) {
+      for (const v of vids) {
+        run += metric === "watch" ? v.minutes[i] : v.views[i];
+      }
+      arr.push(conv(run));
+    }
+    return arr;
+  };
+
+  const ranked = selected.map((v) => ({ v, data: cumulative([v]) }));
+  ranked.sort(
+    (a, b) =>
+      (b.data.length ? b.data[b.data.length - 1] : 0) -
+      (a.data.length ? a.data[a.data.length - 1] : 0)
+  );
+
+  const chosen = ranked.slice(0, top);
+  const rest = ranked.slice(top);
+  const series = chosen.map(({ v, data }) => ({
+    label: v.title,
+    videoId: v.id,
+    type: v.type,
+    data,
+    total: data.length ? data[data.length - 1] : 0,
+    other: false,
+  }));
+
+  if (rest.length) {
+    const data = cumulative(rest.map((r) => r.v));
+    series.push({
+      label: "Other (" + rest.length + " videos)",
+      videoId: "",
+      type: "",
+      data,
+      total: data.length ? data[data.length - 1] : 0,
+      other: true,
+    });
+  }
+
+  let rawTotal = 0;
+  if (si <= ei) {
+    for (let i = si; i <= ei; i++) {
+      for (const v of selected) {
+        rawTotal += metric === "watch" ? v.minutes[i] : v.views[i];
+      }
+    }
+  }
+
+  return {
+    dates: fullDates,
+    series,
+    total: conv(rawTotal),
+    videoCount: selected.length,
+    counts: staticCounts(videos),
+    updated: raw.updated,
+    source: "static",
+    videoSource: raw.videoSource || "cache",
+    filter: kind,
+    metric,
+    unit,
+    subscribers: buildStaticSubscribers(raw, fullDates, si, ei),
+  };
+}
+
+function csvEscape(value) {
+  const s = String(value);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function buildStaticCsv(raw, start, end, kind) {
+  const videos = raw.videos || [];
+  let selected = videos;
+  if (kind === "video") selected = videos.filter((v) => v.type === "videoOnDemand");
+  else if (kind === "shorts") selected = videos.filter((v) => v.type === "shorts");
+  const { si, ei } = staticBounds(raw, selected, start, end);
+  const rows = [];
+  if (si <= ei) {
+    const totals = selected
+      .map((v) => {
+        let t = 0;
+        for (let i = si; i <= ei; i++) t += v.views[i];
+        return { v, t };
+      })
+      .sort((a, b) => b.t - a.t);
+    for (const { v } of totals) {
+      for (let i = si; i <= ei; i++) {
+        if (v.views[i] || v.minutes[i]) {
+          rows.push([raw.dates[i], v.id, v.title, v.type, v.views[i], v.minutes[i]]);
+        }
+      }
+    }
+  }
+  const lines = ["Date,Video ID,Video title,Type,Views,Minutes"];
+  for (const r of rows) lines.push(r.map(csvEscape).join(","));
+  return lines.join("\n");
+}
+
+async function loadRaw(forceReload) {
+  if (!rawCache || forceReload) {
+    const url = "data.json" + (forceReload ? "?v=" + Date.now() : "");
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not load data.json");
+    rawCache = await res.json();
+  }
+  return rawCache;
+}
 
 function setStatus(msg, isErr) {
   const el = $("status");
@@ -218,19 +487,41 @@ function setStatus(msg, isErr) {
 
 async function loadData(forceRefresh) {
   $("refresh").disabled = true;
-  setStatus(forceRefresh ? "Fetching from YouTube (may take a minute)..." : "Loading...");
-  const params = new URLSearchParams();
-  if (forceRefresh) params.set("refresh", "1");
-  params.set("start", $("start").value || "");
-  params.set("end", $("end").value || "");
-  params.set("top", $("top").value);
-  params.set("type", $("type").value);
+  if (forceRefresh) {
+    setStatus(STATIC ? "Reloading snapshot..." : "Fetching from YouTube (may take a minute)...");
+  } else {
+    setStatus("Loading...");
+  }
+  const params = {
+    start: $("start").value || "",
+    end: $("end").value || "",
+    top: $("top").value,
+    type: $("type").value,
+    metric: $("metric").value,
+  };
   try {
-    const res = await fetch("/api/data?" + params.toString());
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    let data;
+    if (STATIC) {
+      const raw = await loadRaw(forceRefresh);
+      data = buildStaticResponse(raw, params);
+    } else {
+      const q = new URLSearchParams();
+      if (forceRefresh) q.set("refresh", "1");
+      q.set("start", params.start);
+      q.set("end", params.end);
+      q.set("top", params.top);
+      q.set("type", params.type);
+      q.set("metric", params.metric);
+      const res = await fetch("/api/data?" + q.toString());
+      data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+    }
     render(data);
-    setStatus(data.source === "live" ? "Live data loaded" : "Showing cached data");
+    if (STATIC) {
+      setStatus("Showing snapshot from " + new Date(data.updated).toLocaleString());
+    } else {
+      setStatus(data.source === "live" ? "Live data loaded" : "Showing cached data");
+    }
   } catch (err) {
     setStatus("Error: " + err.message, true);
   } finally {
@@ -239,11 +530,18 @@ async function loadData(forceRefresh) {
 }
 
 function render(data) {
-  $("kpiTotal").textContent = fmt(data.total);
+  const unit = data.unit || "views";
+  const metricLabel = unit === "hours" ? "watch time" : "views";
+  $("kpiTotalLabel").textContent = "Total " + metricLabel;
+  $("kpiTotal").textContent = fmtMetric(data.total, unit);
   $("kpiVideos").textContent = fmt(data.videoCount);
   $("kpiDays").textContent = fmt(data.dates.length);
   $("kpiEnd").textContent = data.dates.length ? data.dates[data.dates.length - 1] : "-";
   $("updated").textContent = "Last updated: " + new Date(data.updated).toLocaleString();
+  $("chartTitle").textContent = "Cumulative " + metricLabel + " per video";
+  $("totalTitle").textContent = "Channel total cumulative " + metricLabel;
+  $("dailyTitle").textContent = "Daily " + metricLabel + " (all videos)";
+  $("listTitle").textContent = "Top videos by " + metricLabel;
 
   const counts = data.counts || {};
   const setOption = (val, text) => {
@@ -286,7 +584,7 @@ function render(data) {
   chart = new Chart($("chart"), {
     type: "line",
     data: { labels, datasets },
-    options: baseOptions(data.dates, true),
+    options: baseOptions(data.dates, true, unit),
   });
 
   const totalCumulative = data.dates.map((_, i) =>
@@ -300,7 +598,7 @@ function render(data) {
     data: {
       labels,
       datasets: [{
-        label: "Total cumulative views",
+        label: "Total cumulative " + metricLabel,
         data: totalCumulative,
         borderColor: "#ff3b5c",
         backgroundColor: "#ff3b5c",
@@ -311,7 +609,7 @@ function render(data) {
         fill: false,
       }],
     },
-    options: baseOptions(data.dates, false),
+    options: baseOptions(data.dates, false, unit),
   });
 
   if (dailyChart) dailyChart.destroy();
@@ -320,14 +618,73 @@ function render(data) {
     data: {
       labels,
       datasets: [{
-        label: "Views per day",
+        label: metricLabel + " per day",
         data: daily,
         backgroundColor: "rgba(59,160,255,0.7)",
         borderWidth: 0,
         borderRadius: 2,
       }],
     },
-    options: baseOptions(data.dates, false),
+    options: baseOptions(data.dates, false, unit),
+  });
+
+  const subs = data.subscribers || {};
+  const subsDates = subs.dates || [];
+  const subsLabels = subsDates.map((d) => d.slice(0, 7));
+  $("kpiSubs").textContent = subs.current != null ? fmt(subs.current) : "-";
+  const netEl = $("kpiSubsNet");
+  if (subsDates.length) {
+    const n = Number(subs.netChange || 0);
+    netEl.textContent = (n >= 0 ? "+" : "") + fmt(n) + " in range";
+    netEl.style.color = n < 0 ? "#ff6b6b" : "#3bffb0";
+  } else {
+    netEl.textContent = "";
+  }
+  $("subsTitle").textContent = subs.anchored ? "Subscriber total" : "Net subscribers gained";
+
+  if (subsChart) subsChart.destroy();
+  subsChart = new Chart($("subsChart"), {
+    type: "line",
+    data: {
+      labels: subsLabels,
+      datasets: [{
+        label: subs.anchored ? "Total subscribers" : "Net subscribers gained",
+        data: subs.total || [],
+        borderColor: "#3bffb0",
+        backgroundColor: "#3bffb0",
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHitRadius: 8,
+        tension: 0.15,
+        fill: false,
+      }],
+    },
+    options: baseOptions(subsDates, false, "views"),
+  });
+
+  if (subsDailyChart) subsDailyChart.destroy();
+  subsDailyChart = new Chart($("subsDailyChart"), {
+    type: "bar",
+    data: {
+      labels: subsLabels,
+      datasets: [
+        {
+          label: "Gained",
+          data: subs.gained || [],
+          backgroundColor: "rgba(59,255,176,0.75)",
+          borderRadius: 2,
+          borderWidth: 0,
+        },
+        {
+          label: "Lost",
+          data: subs.lost || [],
+          backgroundColor: "rgba(255,107,107,0.75)",
+          borderRadius: 2,
+          borderWidth: 0,
+        },
+      ],
+    },
+    options: baseOptions(subsDates, true, "views"),
   });
 
   const all = data.series.filter((s) => !s.other).slice(0, 10);
@@ -340,13 +697,13 @@ function render(data) {
       : (s.type === "videoOnDemand" ? '<span class="badge video">VIDEO</span>' : "");
     return `<div class="video-item">
       <div class="video-title">${badge}${escapeHtml(s.label)}</div>
-      <div class="video-meta"><span>${s.videoId}</span><span>${fmt(s.total)}</span></div>
+      <div class="video-meta"><span>${s.videoId}</span><span>${fmtMetric(s.total, unit)}</span></div>
       <div class="bar"><div style="width:${w}%;background:${color}"></div></div>
     </div>`;
   }).join("") || '<div class="empty">No data</div>';
 }
 
-function baseOptions(dates, showLegend) {
+function baseOptions(dates, showLegend, unit) {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -360,7 +717,7 @@ function baseOptions(dates, showLegend) {
         callbacks: {
           title: (items) => dates[items[0].dataIndex],
           label: (item) =>
-            (item.dataset.label ? item.dataset.label + ": " : "") + fmt(item.parsed.y),
+            (item.dataset.label ? item.dataset.label + ": " : "") + fmtMetric(item.parsed.y, unit),
         },
       },
     },
@@ -382,7 +739,68 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function downloadChart(name, baseName) {
+  const refs = { chart, totalChart, dailyChart, subsChart, subsDailyChart };
+  const c = refs[name];
+  if (!c) return;
+  const src = c.canvas;
+  const pad = 16;
+  const out = document.createElement("canvas");
+  out.width = src.width + pad * 2;
+  out.height = src.height + pad * 2;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#0f1115";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(src, pad, pad);
+  const a = document.createElement("a");
+  a.href = out.toDataURL("image/png");
+  a.download = baseName + ".png";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+if (STATIC) $("refresh").textContent = "Reload snapshot";
+$("downloadCsv").addEventListener("click", async () => {
+  if (!STATIC) {
+    const params = new URLSearchParams();
+    params.set("start", $("start").value || "");
+    params.set("end", $("end").value || "");
+    params.set("type", $("type").value);
+    const a = document.createElement("a");
+    a.href = "/api/export.csv?" + params.toString();
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
+  try {
+    const raw = await loadRaw(false);
+    const startVal = $("start").value;
+    const endVal = $("end").value;
+    const start = startVal || raw.dates[0];
+    const end = endVal || raw.dates[raw.dates.length - 1];
+    const kind = $("type").value;
+    const csv = buildStaticCsv(raw, startVal, endVal, kind);
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `youtube_dashboard_${start}_to_${end}_${kind}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setStatus("Error: " + err.message, true);
+  }
+});
+document.querySelectorAll("button[data-chart]").forEach((btn) => {
+  btn.addEventListener("click", () => downloadChart(btn.dataset.chart, btn.dataset.name));
+});
 $("refresh").addEventListener("click", () => loadData(true));
+$("metric").addEventListener("change", () => loadData(false));
 $("type").addEventListener("change", () => loadData(false));
 $("top").addEventListener("change", () => loadData(false));
 $("start").addEventListener("change", () => loadData(false));
