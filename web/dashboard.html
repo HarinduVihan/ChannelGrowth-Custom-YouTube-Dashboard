@@ -146,6 +146,21 @@
   .bar { height: 5px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .bar > div { height: 100%; border-radius: 4px; }
   .empty { color: var(--muted); font-size: 14px; padding: 20px 0; }
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 18px;
+    margin-top: 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .site-footer a { color: var(--muted); text-decoration: underline; }
+  .site-footer a:hover { color: var(--text); }
 </style>
 </head>
 <body>
@@ -236,6 +251,11 @@
       <div id="videoList"><div class="empty">No data</div></div>
     </div>
   </div>
+
+  <footer class="site-footer">
+    <span>HV Dashboard &mdash; personal YouTube analytics dashboard for the HVenom channel.</span>
+    <span><a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></span>
+  </footer>
 </div>
 
 <script>

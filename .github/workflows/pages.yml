@@ -44,6 +44,8 @@ jobs:
         run: python scripts/per_video_growth.py
 
       - name: Build static site
+        env:
+          CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN }}
         run: python scripts/build_static.py
 
       - uses: actions/configure-pages@v5

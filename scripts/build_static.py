@@ -1,6 +1,7 @@
 import bisect
 import csv
 import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -107,6 +108,23 @@ def load_subscribers(date_list):
     }
 
 
+def copy_info_pages():
+    for name in ("privacy.html", "terms.html"):
+        src = BASE / "web" / name
+        if not src.exists():
+            raise SystemExit(f"Missing web/{name}.")
+        (DIST / name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def custom_domain():
+    domain = os.environ.get("CUSTOM_DOMAIN", "").strip()
+    if not domain:
+        cname_path = BASE / "web" / "CNAME"
+        if cname_path.exists():
+            domain = cname_path.read_text(encoding="utf-8").strip()
+    return domain.replace("https://", "").replace("http://", "").strip("/")
+
+
 def main():
     date_list, videos = load_videos()
     subscribers = load_subscribers(date_list)
@@ -133,11 +151,17 @@ def main():
         html.replace(marker, "window.DASHBOARD_STATIC = true;"), encoding="utf-8"
     )
     (DIST / ".nojekyll").write_text("", encoding="utf-8")
+    copy_info_pages()
+
+    domain = custom_domain()
+    if domain:
+        (DIST / "CNAME").write_text(domain + "\n", encoding="utf-8")
 
     size_mb = data_path.stat().st_size / (1024 * 1024)
+    extra = f", CNAME {domain}" if domain else ""
     print(
         f"Built {DIST} - {len(date_list)} days, {len(videos)} videos, "
-        f"data.json {size_mb:.2f} MB"
+        f"data.json {size_mb:.2f} MB{extra}"
     )
 
 
