@@ -3,55 +3,470 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Channel Growth Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>window.DASHBOARD_STATIC = false;</script>
+<meta name="description" content="Private, browser-only analytics for your YouTube channel: views, watch time, subscriber growth, and top videos." />
+<meta name="color-scheme" content="dark" />
+<title>Channel Growth - Private channel analytics</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f1115'/%3E%3Cpath d='M38 28l30 22-30 22z' fill='%23ff0033'/%3E%3C/svg%3E" />
+<script src="vendor/chart.umd.min.js"></script>
+<script src="config.js"></script>
 <style>
   :root {
     --bg: #0f1115;
     --panel: #171a21;
     --panel-2: #1f232c;
+    --panel-3: #252a35;
     --text: #e8eaed;
-    --muted: #9aa0aa;
+    --muted: #8b93a1;
+    --muted-2: #6f7785;
     --accent: #ff0033;
+    --accent-soft: rgba(255, 0, 51, 0.12);
+    --blue: #3ba0ff;
+    --green: #34d399;
+    --red: #f87171;
     --border: #2a2f3a;
+    --border-soft: rgba(255, 255, 255, 0.06);
+    --radius: 14px;
+    --shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
-  header {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(620px 420px at 12% -5%, rgba(255, 0, 51, 0.13), transparent 65%),
+      radial-gradient(760px 520px at 100% 5%, rgba(59, 160, 255, 0.1), transparent 65%);
+  }
+  a { color: #8ab4ff; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 26px;
-    border-bottom: 1px solid var(--border);
     gap: 16px;
     flex-wrap: wrap;
+    padding: 14px 26px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(15, 17, 21, 0.82);
+    backdrop-filter: blur(14px);
   }
-  h1 { font-size: 20px; margin: 0; font-weight: 600; }
-  h1 span { color: var(--accent); }
-  .updated { color: var(--muted); font-size: 13px; }
-  .wrap { padding: 20px 26px 40px; max-width: 1500px; margin: 0 auto; }
-  .kpis {
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .brand-mark {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px;
-    margin-bottom: 18px;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    padding-left: 2px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(255, 0, 51, 0.25);
   }
-  .card {
-    background: var(--panel);
+  .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+  .brand-text strong { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+  .brand-text small { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .account { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .account img {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    object-fit: cover;
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 18px;
   }
-  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-  .card .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
-  .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .account-meta { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  .account-meta strong {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .account-meta span { color: var(--muted); font-size: 11px; }
+
+  .gate {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: clamp(34px, 8vh, 90px) 24px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    min-height: calc(100vh - 64px);
+  }
+  .gate-card {
+    width: 100%;
+    background: linear-gradient(180deg, rgba(31, 35, 44, 0.92), rgba(23, 26, 33, 0.96));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: clamp(26px, 5vw, 44px);
+    box-shadow: var(--shadow);
+  }
+  .eyebrow {
+    color: #ff8ba0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .gate h1 {
+    margin: 0 0 14px;
+    font-size: clamp(29px, 5vw, 42px);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-weight: 700;
+  }
+  .gate .lede {
+    margin: 0 0 22px;
+    color: #c3c8d1;
+    font-size: 16px;
+    max-width: 58ch;
+  }
+  .checks { list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 10px; }
+  .checks li { position: relative; padding-left: 28px; color: #c3c8d1; font-size: 14px; }
+  .checks li::before {
+    content: "\2713";
+    position: absolute;
+    left: 0;
+    top: -1px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(52, 211, 153, 0.15);
+    color: var(--green);
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .fine { margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+  .gate-status { margin: 12px 0 0; color: var(--muted); font-size: 13px; min-height: 20px; }
+  .gate-status.err { color: #ff8b8b; }
+  .gate-foot { margin: 0; color: var(--muted); font-size: 12px; }
+  .gate-foot a { color: var(--muted); }
+  .gate-foot a:hover { color: var(--text); }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 0;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    padding: 9px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  button:hover:not(:disabled) { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #fff;
+    color: #1f1f1f;
+    font-weight: 650;
+    font-size: 15px;
+    padding: 12px 20px;
+    min-height: 46px;
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.3);
+  }
+  .primary:hover:not(:disabled) { opacity: 0.92; }
+  .primary svg { flex: 0 0 auto; }
+  .ghost {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 13px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .ghost:hover:not(:disabled) { border-color: #49505e; background: var(--panel-3); }
+
+  .wrap {
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 20px 26px 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
+  .rangebar {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 14px 18px;
+    padding: 14px 16px;
+  }
+  .presets { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .chip:hover:not(:disabled) { color: var(--text); border-color: #49505e; }
+  .chip.active { color: #fff; border-color: rgba(255, 0, 51, 0.6); background: var(--accent-soft); }
+  .dates { display: flex; gap: 10px; flex-wrap: wrap; }
+  .dates label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  input[type="date"] {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font: inherit;
+    font-size: 13px;
+    color-scheme: dark;
+  }
+  input[type="date"]:focus { border-color: var(--accent); outline: none; }
+  .range-actions { display: flex; gap: 8px; margin-left: auto; }
+  .status { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 12px; min-height: 17px; }
+  .status.err { color: #ff8b8b; }
+  body.is-busy .charts, body.is-busy .top-card { opacity: 0.58; transition: opacity 0.2s ease; }
+
+  .notice { border-radius: 10px; padding: 10px 13px; font-size: 12.5px; line-height: 1.5; }
+  .notice.warn { background: rgba(255, 207, 59, 0.08); border: 1px solid rgba(255, 207, 59, 0.28); color: #ffd66b; }
+  .notice.error { background: rgba(248, 113, 113, 0.09); border: 1px solid rgba(248, 113, 113, 0.3); color: #ffaaaa; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 13px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px 17px 14px; min-width: 0; }
+  .kpi-label {
+    display: block;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .kpi-value {
+    display: block;
+    margin-top: 7px;
+    font-size: 27px;
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-value.positive { color: var(--green); }
+  .kpi-value.negative { color: var(--red); }
+  .kpi-sub {
+    display: block;
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 11.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .data-through { margin: -2px 2px 0; color: var(--muted); font-size: 12px; }
+
+  .charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .chart-card { padding: 16px; min-width: 0; }
+  .span-2 { grid-column: 1 / -1; }
+  .chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .chart-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .chart-head h2, .top-head h2 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #b7bdc8;
+  }
+  .chart-head span, .top-head span { color: var(--muted-2); font-size: 11px; }
+  .chart-tools { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; margin-left: auto; }
+  .chart-controls { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .chart-controls label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--muted-2);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .chart-controls select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 5px 7px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .chart-controls select:focus { border-color: var(--accent); outline: none; }
+  .chart-btn {
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 5px 9px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .chart-btn:hover:not(:disabled) { color: var(--text); border-color: #49505e; background: var(--panel-3); }
+  .chart-card.is-busy { opacity: 0.58; transition: opacity 0.2s ease; }
+  .chart-holder { position: relative; height: 300px; }
+  .chart-holder.tall { height: 340px; }
+  .chart-holder.short { height: 250px; }
+
+  .top-card { padding: 16px; overflow: hidden; }
+  .top-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 620px; }
+  th, td { text-align: left; padding: 10px 8px; }
+  th {
+    color: var(--muted-2);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr { border-bottom: 1px solid var(--border-soft); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255, 255, 255, 0.018); }
+  td { font-size: 13px; vertical-align: middle; }
+  td.rank { width: 34px; color: var(--muted-2); font-size: 12px; }
+  .video-cell { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .thumb {
+    flex: 0 0 auto;
+    display: block;
+    width: 72px;
+    height: 40px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .video-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .video-title {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1.35;
+    max-width: 720px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .video-title:hover { color: #fff; text-decoration: underline; }
+  .video-id { color: var(--muted-2); font-size: 10.5px; font-family: ui-monospace, Consolas, monospace; }
+  .badge {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .badge.short { background: rgba(255, 59, 92, 0.16); color: #ff9caf; }
+  .badge.video { background: rgba(59, 160, 255, 0.16); color: #93c8ff; }
+  .badge.live { background: rgba(255, 207, 59, 0.14); color: #ffd76b; }
+  .badge.other { background: rgba(139, 147, 161, 0.16); color: #b5bcc7; }
+  .empty { color: var(--muted); font-size: 13px; padding: 22px 4px 26px; text-align: center; }
+
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 20px;
+    margin-top: 8px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--muted-2);
+    font-size: 11.5px;
+  }
+  .site-footer a { color: var(--muted); }
+  .site-footer a:hover { color: var(--text); }
+
+  @media (max-width: 900px) {
+    .charts { grid-template-columns: 1fr; }
+    .span-2 { grid-column: auto; }
+    .range-actions { margin-left: 0; }
+  }
+  @media (max-width: 620px) {
+    .topbar { padding: 12px 16px; }
+    .wrap { padding: 14px 14px 36px; }
+    .gate { padding: 28px 14px 34px; }
+    .kpi-value { font-size: 24px; }
+    .chart-holder, .chart-holder.tall { height: 250px; }
+    .chart-holder.short { height: 220px; }
+    .account-meta strong { max-width: 140px; }
+    .brand-text small { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+  }
+
+  /* Branch 2 dashboard structure */
+  .header-right { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+  .updated { color: var(--muted); font-size: 13px; }
   .controls {
     display: flex;
     gap: 12px;
@@ -65,33 +480,43 @@
   }
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field label { font-size: 12px; color: var(--muted); }
-  input[type="date"], input[type="number"], select {
+  .controls select {
     background: var(--panel-2);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 10px;
+    font: inherit;
     font-size: 14px;
     outline: none;
   }
-  input:focus, select:focus { border-color: var(--accent); }
-  button {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 9px 18px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity .15s;
+  .controls select:focus { border-color: var(--accent); }
+  .controls .status { flex-basis: auto; margin: 0 0 9px auto; min-height: 0; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .kpis .card { padding: 16px 18px; }
+  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .card .value { font-size: 26px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
+  .main-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .main-col .chart-card, .list-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
   }
-  button:hover { opacity: .88; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-  button.secondary:hover { border-color: var(--accent); opacity: 1; }
-  .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-  .chart-head .chart-title { margin: 0; }
+  .main-col .chart-head { align-items: center; flex-wrap: nowrap; }
+  .main-col .chart-head .chart-title {
+    display: block;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .main-col .chart-holder { height: 460px; }
+  .main-col .chart-holder.small { height: 280px; }
   .mini {
     background: var(--panel-2);
     color: var(--muted);
@@ -102,710 +527,1871 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .mini:hover { color: var(--text); border-color: var(--accent); opacity: 1; }
-  .status { color: var(--muted); font-size: 13px; margin-left: auto; }
-  .status.err { color: #ff6b6b; }
-  .notice {
-    background: rgba(255, 207, 59, 0.1);
-    border: 1px solid rgba(255, 207, 59, 0.35);
-    color: #ffcf3b;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 13px;
-    margin-bottom: 18px;
+  .mini:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+  .list-card h2 {
+    font-size: 14px;
+    margin: 0 0 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
   }
-  .badge {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .05em;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
-  .badge.short { background: rgba(255,59,92,.18); color: #ff8ba0; }
-  .badge.video { background: rgba(59,160,255,.18); color: #8ac2ff; }
-  .grid { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
-  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
-  .main-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-  .chart-card, .list-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-  }
-  .chart-title { font-size: 14px; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-  .chart-holder { position: relative; height: 460px; }
-  .chart-holder.small { height: 280px; }
-  .list-card h2 { font-size: 14px; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .list-card { overflow: hidden; }
   .video-item { padding: 9px 0; border-bottom: 1px solid var(--border); }
   .video-item:last-child { border-bottom: none; }
-  .video-title { font-size: 13px; line-height: 1.35; margin-bottom: 4px; }
-  .video-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .list-card .video-title {
+    display: block;
+    max-width: none;
+    overflow: visible;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.35;
+    margin-bottom: 4px;
+    -webkit-line-clamp: unset;
+  }
+  .list-card .video-title:hover { text-decoration: none; }
+  .video-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .video-meta span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bar { height: 5px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .bar > div { height: 100%; border-radius: 4px; }
-  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; }
-  .site-footer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px 18px;
-    margin-top: 24px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.5;
+  .list-card .empty { text-align: left; padding: 20px 0; }
+  body.is-busy .grid { opacity: 0.58; transition: opacity 0.2s ease; }
+  @media (max-width: 1000px) {
+    .grid { grid-template-columns: 1fr; }
   }
-  .site-footer a { color: var(--muted); text-decoration: underline; }
-  .site-footer a:hover { color: var(--text); }
+  @media (max-width: 620px) {
+    .main-col .chart-holder, .main-col .chart-holder.small { height: 250px; }
+    .controls .status { flex-basis: 100%; margin-left: 0; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>Channel Growth <span>&#9654;</span> YouTube Analytics</h1>
-  <div class="updated" id="updated">Not loaded</div>
+<header class="topbar">
+  <a class="brand" href="" id="brandRefresh" aria-label="Refresh dashboard">
+    <span class="brand-mark" aria-hidden="true">&#9654;</span>
+    <span class="brand-text">
+      <strong>Channel Growth</strong>
+      <small>YouTube Analytics</small>
+    </span>
+  </a>
+  <div class="header-right">
+    <div class="updated" id="updated">Not loaded</div>
+    <div class="account" id="account" hidden>
+      <img id="accountAvatar" alt="" hidden />
+      <div class="account-meta">
+        <strong id="accountName">Connected channel</strong>
+        <span>Read-only access</span>
+      </div>
+      <button type="button" class="ghost" id="signOut">Sign out</button>
+    </div>
+  </div>
 </header>
 
-<div class="wrap">
-  <div class="kpis">
+<main class="gate" id="gate">
+  <section class="gate-card">
+    <div class="eyebrow">Your channel, your browser</div>
+    <h1>Understand what drives your channel growth.</h1>
+    <p class="lede">
+      Connect the Google account that manages your channel to see views, watch time,
+      subscriber changes, and your top videos. Channel Growth is a static site: your
+      analytics load directly from Google into this tab.
+    </p>
+    <ul class="checks">
+      <li>Read-only access through Google</li>
+      <li>No account, database, or server-side storage</li>
+      <li>Sign out or close the tab to clear the session</li>
+    </ul>
+    <button type="button" class="primary" id="connect">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.909c1.702-1.567 2.683-3.874 2.683-6.615z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.859-3.047.859-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9.001 9.001 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.963 10.706A5.41 5.41 0 0 1 3.682 9c0-.592.102-1.167.281-1.706V4.962H.956A9.001 9.001 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.582C13.463.892 11.426 0 9 0A9.001 9.001 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58z"/>
+      </svg>
+      Continue with Google
+    </button>
+    <p class="gate-status" id="gateStatus" role="status">Connect your Google account to load your channel analytics.</p>
+    <p class="fine">You can revoke access at any time from your Google Account permissions page.</p>
+    <div class="notice warn" id="configNotice" hidden></div>
+  </section>
+  <p class="gate-foot"><a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></p>
+</main>
+
+<main class="wrap" id="app" hidden>
+  <section class="kpis" aria-label="Key metrics">
     <div class="card"><div class="label" id="kpiTotalLabel">Total views</div><div class="value" id="kpiTotal">-</div></div>
     <div class="card"><div class="label">Videos tracked</div><div class="value" id="kpiVideos">-</div></div>
     <div class="card"><div class="label">Days</div><div class="value" id="kpiDays">-</div></div>
     <div class="card"><div class="label">Data through</div><div class="value" id="kpiEnd">-</div></div>
     <div class="card"><div class="label">Subscribers</div><div class="value" id="kpiSubs">-</div><div class="sub" id="kpiSubsNet"></div></div>
-  </div>
+  </section>
 
-  <div class="controls">
-    <div class="field"><label>Start</label><input type="date" id="start" /></div>
-    <div class="field"><label>End</label><input type="date" id="end" /></div>
-    <div class="field"><label>Metric</label>
-      <select id="metric">
+  <div class="controls" aria-label="Date range and actions">
+    <div class="field"><label for="startDate">Start</label><input type="date" id="startDate" /></div>
+    <div class="field"><label for="endDate">End</label><input type="date" id="endDate" /></div>
+    <div class="field">
+      <label for="videoMetric">Metric</label>
+      <select id="videoMetric">
         <option value="views" selected>Views</option>
         <option value="watch">Watch time (hours)</option>
       </select>
     </div>
-    <div class="field"><label>Content</label>
-      <select id="type">
+    <div class="field">
+      <label for="videoType">Content</label>
+      <select id="videoType">
         <option value="all" selected>All</option>
         <option value="video">Videos</option>
         <option value="shorts">Shorts</option>
       </select>
     </div>
-    <div class="field"><label>Videos shown</label>
-      <select id="top">
+    <div class="field">
+      <label for="videoTop">Videos shown</label>
+      <select id="videoTop">
         <option value="5">Top 5</option>
         <option value="10" selected>Top 10</option>
         <option value="15">Top 15</option>
         <option value="20">Top 20</option>
       </select>
     </div>
-    <button id="refresh">Refresh from YouTube</button>
-    <button id="downloadCsv" class="secondary">Download CSV</button>
-    <div class="status" id="status">Loading...</div>
+    <button type="button" id="refresh">Refresh from YouTube</button>
+    <button type="button" id="exportCsv" class="ghost" disabled>Download CSV</button>
+    <div class="status" id="status" role="status">Loading...</div>
   </div>
-  <div class="notice" id="notice" style="display:none"></div>
+  <div class="notice warn" id="appNotice" hidden></div>
+  <div class="notice error" id="appError" hidden></div>
 
   <div class="grid">
     <div class="main-col">
-      <div class="chart-card">
+      <article class="chart-card" id="videoChartCard">
         <div class="chart-head">
-          <h2 class="chart-title" id="chartTitle">Cumulative views per video</h2>
-          <button class="mini" data-chart="chart" data-name="views-by-video">PNG</button>
+          <h2 class="chart-title" id="videoChartTitle">Cumulative views per video</h2>
+          <button type="button" class="mini" data-chart="videoChart" data-name="views-by-video">PNG</button>
         </div>
-        <div class="chart-holder"><canvas id="chart"></canvas></div>
-      </div>
-      <div class="chart-card">
+        <div class="chart-holder"><canvas id="videoChart"></canvas></div>
+      </article>
+      <article class="chart-card">
         <div class="chart-head">
           <h2 class="chart-title" id="totalTitle">Channel total cumulative views</h2>
-          <button class="mini" data-chart="totalChart" data-name="channel-total">PNG</button>
+          <button type="button" class="mini" data-chart="cumulativeChart" data-name="channel-total">PNG</button>
         </div>
-        <div class="chart-holder small"><canvas id="totalChart"></canvas></div>
-      </div>
-      <div class="chart-card">
+        <div class="chart-holder small"><canvas id="cumulativeChart"></canvas></div>
+      </article>
+      <article class="chart-card">
         <div class="chart-head">
           <h2 class="chart-title" id="dailyTitle">Daily views (all videos)</h2>
-          <button class="mini" data-chart="dailyChart" data-name="daily-activity">PNG</button>
+          <button type="button" class="mini" data-chart="viewsChart" data-name="daily-activity">PNG</button>
         </div>
-        <div class="chart-holder small"><canvas id="dailyChart"></canvas></div>
-      </div>
-      <div class="chart-card">
+        <div class="chart-holder small"><canvas id="viewsChart"></canvas></div>
+      </article>
+      <article class="chart-card">
         <div class="chart-head">
-          <h2 class="chart-title" id="subsTitle">Subscriber total</h2>
-          <button class="mini" data-chart="subsChart" data-name="subscriber-total">PNG</button>
+          <h2 class="chart-title" id="subsTotalTitle">Subscriber total</h2>
+          <button type="button" class="mini" data-chart="subsTotalChart" data-name="subscriber-total">PNG</button>
         </div>
-        <div class="chart-holder small"><canvas id="subsChart"></canvas></div>
-      </div>
-      <div class="chart-card">
+        <div class="chart-holder small"><canvas id="subsTotalChart"></canvas></div>
+      </article>
+      <article class="chart-card">
         <div class="chart-head">
           <h2 class="chart-title">Subscribers gained / lost per day</h2>
-          <button class="mini" data-chart="subsDailyChart" data-name="subscribers-daily">PNG</button>
+          <button type="button" class="mini" data-chart="subsChart" data-name="subscribers-daily">PNG</button>
         </div>
-        <div class="chart-holder small"><canvas id="subsDailyChart"></canvas></div>
-      </div>
+        <div class="chart-holder small"><canvas id="subsChart"></canvas></div>
+      </article>
     </div>
-    <div class="list-card">
+
+    <aside class="list-card" aria-label="Top videos">
       <h2 id="listTitle">Top videos by views</h2>
       <div id="videoList"><div class="empty">No data</div></div>
-    </div>
+    </aside>
   </div>
 
   <footer class="site-footer">
-    <span>HV Dashboard &mdash; personal YouTube analytics dashboard for the HVenom channel.</span>
+    <span>Channel Growth &mdash; analytics are processed in your browser and are not stored on our servers.</span>
     <span><a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></span>
   </footer>
-</div>
+</main>
 
 <script>
-const PALETTE = [
-  "#ff3b5c","#3ba0ff","#3bffb0","#ffcf3b","#b46bff","#ff8a3b",
-  "#5bd6ff","#ff5bd6","#8aff3b","#ff6b6b","#6b8aff","#d6ff3b",
-  "#3bffd6","#ffb46b","#8a6bff","#6bff8a","#ff3bd6","#3b6bff",
-  "#d63bff","#ffd63b"
-];
-const OTHER_COLOR = "#4a5160";
-let chart = null;
-let totalChart = null;
-let dailyChart = null;
-let subsChart = null;
-let subsDailyChart = null;
-const STATIC = !!window.DASHBOARD_STATIC;
-let rawCache = null;
+(function () {
+  "use strict";
 
-const $ = (id) => document.getElementById(id);
-const fmt = (n) => Number(n).toLocaleString();
-const compact = (n) => {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
-  return String(n);
-};
-const fmtMetric = (n, unit) => {
-  const num = Number(n);
-  if (unit === "hours") {
-    return num.toLocaleString(undefined, { maximumFractionDigits: 1 }) + " h";
+  var CFG = window.CHANNEL_GROWTH_CONFIG || {};
+  var CLIENT_ID = String(CFG.clientId || "").trim();
+  var SCOPES = Array.isArray(CFG.scopes) && CFG.scopes.length ? CFG.scopes : [
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+    "https://www.googleapis.com/auth/youtube.readonly"
+  ];
+  var PLACEHOLDER = !CLIENT_ID || /^REPLACE/i.test(CLIENT_ID) || !/\.apps\.googleusercontent\.com$/i.test(CLIENT_ID);
+  var TOKEN_KEY = "channel_growth_token";
+  var ANALYTICS_URL = "https://youtubeanalytics.googleapis.com/v2/reports";
+  var DATA_URL = "https://www.googleapis.com/youtube/v3/";
+
+  var TYPE_LABEL = {
+    SHORTS: "Short",
+    VIDEO_ON_DEMAND: "Video",
+    LIVE_STREAM: "Live",
+    STORY: "Story",
+    UNSPECIFIED: "Other"
+  };
+  var TYPE_CLASS = {
+    SHORTS: "short",
+    VIDEO_ON_DEMAND: "video",
+    LIVE_STREAM: "live",
+    STORY: "other",
+    UNSPECIFIED: "other"
+  };
+  var PALETTE = [
+    "#ff3b5c", "#3ba0ff", "#34d399", "#f5c451", "#a78bfa",
+    "#f97316", "#22d3ee", "#fb7185", "#84cc16", "#e879f9",
+    "#60a5fa", "#facc15", "#2dd4bf", "#c084fc", "#f43f5e",
+    "#38bdf8", "#4ade80", "#fbbf24", "#818cf8", "#f472b6"
+  ];
+  var OTHER_COLOR = "#7d8595";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var intFmt = new Intl.NumberFormat();
+  var compactFmt = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
+  var hourFmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+
+  var accessToken = null;
+  var tokenExpiresAt = 0;
+  var tokenTimer = null;
+  var tokenClient = null;
+  var gisLoader = null;
+  var charts = {};
+  var currentData = null;
+  var requestSeq = 0;
+  var videoSeq = 0;
+  var videoDailyCache = {};
+  var loadTimer = null;
+
+  function num(value) {
+    var n = Number(value);
+    return Number.isFinite(n) ? n : 0;
   }
-  return fmt(num);
-};
+  function fmtInt(value) { return intFmt.format(num(value)); }
+  function fmtCompact(value) { return compactFmt.format(num(value)); }
+  function fmtHours(hours) { return hourFmt.format(num(hours)) + " h"; }
+  function fmtSigned(value) {
+    var n = num(value);
+    return (n > 0 ? "+" : "") + intFmt.format(n);
+  }
+  function rawType(value) {
+    var t = String(value || "").toUpperCase();
+    return TYPE_LABEL[t] ? t : "UNSPECIFIED";
+  }
+  function contentFilterType(type) {
+    var t = String(type || "").toUpperCase();
+    if (t === "SHORTS" || t === "LIVE_STREAM" || t === "STORY") return t;
+    return "VIDEO_ON_DEMAND";
+  }
+  function splitBucket(type) {
+    if (type === "SHORTS") return "SHORTS";
+    if (type === "VIDEO_ON_DEMAND") return "VIDEO_ON_DEMAND";
+    return "OTHER";
+  }
+  function shortTitle(value, max) {
+    var text = String(value == null ? "" : value);
+    var limit = max || 34;
+    return text.length > limit ? text.slice(0, limit - 3) + "..." : text;
+  }
+  function typeFilterLabel(value) {
+    if (value === "shorts") return "Shorts";
+    if (value === "video") return "Videos";
+    return "All content";
+  }
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function csvCell(value) {
+    var s = String(value == null ? "" : value);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
 
-function staticCounts(videos) {
-  const counts = { all: videos.length, video: 0, shorts: 0, unknown: 0 };
-  videos.forEach((v) => {
-    if (v.type === "shorts") counts.shorts += 1;
-    else if (v.type === "videoOnDemand") counts.video += 1;
-    else counts.unknown += 1;
-  });
-  return counts;
-}
+  function pacificDate(value) {
+    var date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return "";
+    var parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+    var map = {};
+    parts.forEach(function (part) {
+      if (part.type !== "literal") map[part.type] = part.value;
+    });
+    return map.year + "-" + map.month + "-" + map.day;
+  }
+  function pacificToday() {
+    return pacificDate(new Date());
+  }
+  function addDays(isoDate, days) {
+    var d = new Date(isoDate + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
 
-function staticBounds(raw, selected, start, end) {
-  const dates = raw.dates;
-  let first = -1;
-  let last = -1;
-  selected.forEach((v) => {
-    for (let i = 0; i < dates.length; i++) {
-      if (v.views[i] || v.minutes[i]) {
-        if (first < 0 || i < first) first = i;
-        if (i > last) last = i;
+  function defaultGateMessage() {
+    return PLACEHOLDER ? "This deployment is not configured yet." : "Connect your Google account to load your channel analytics.";
+  }
+  function setGateStatus(message, isError) {
+    var el = $("gateStatus");
+    el.textContent = message || "";
+    el.className = "gate-status" + (isError ? " err" : "");
+  }
+  function setStatus(message, isError) {
+    var el = $("status");
+    el.textContent = message || "";
+    el.className = "status" + (isError ? " err" : "");
+  }
+  function showNotice(message) {
+    var el = $("appNotice");
+    el.textContent = message;
+    el.hidden = !message;
+  }
+  function hideNotice() { $("appNotice").hidden = true; }
+  function showError(message) {
+    var el = $("appError");
+    el.textContent = message;
+    el.hidden = false;
+  }
+  function hideError() { $("appError").hidden = true; }
+
+  function readStoredToken() {
+    try {
+      var raw = sessionStorage.getItem(TOKEN_KEY);
+      if (!raw) return false;
+      var saved = JSON.parse(raw);
+      if (!saved || !saved.access_token || !saved.expires_at) return false;
+      if (Number(saved.expires_at) <= Date.now() + 30000) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        return false;
       }
+      accessToken = saved.access_token;
+      tokenExpiresAt = Number(saved.expires_at);
+      return true;
+    } catch (err) {
+      try { sessionStorage.removeItem(TOKEN_KEY); } catch (ignored) { /* ignore */ }
+      return false;
     }
-  });
-  if (first < 0) return { si: 0, ei: -1 };
-  let si = first;
-  if (start) {
-    const pos = dates.findIndex((d) => d >= start);
-    si = pos < 0 ? last : Math.max(pos, first);
   }
-  let ei = last;
-  if (end) {
-    let pos = dates.length - 1;
-    while (pos >= 0 && dates[pos] > end) pos -= 1;
-    ei = Math.min(pos, last);
+  function storeToken(response) {
+    accessToken = response.access_token;
+    tokenExpiresAt = Date.now() + (Number(response.expires_in) || 3600) * 1000;
+    try {
+      sessionStorage.setItem(TOKEN_KEY, JSON.stringify({
+        access_token: accessToken,
+        expires_at: tokenExpiresAt
+      }));
+    } catch (err) { /* storage may be unavailable; keep the in-memory token */ }
+    armTokenTimer();
   }
-  if (ei < si) {
-    si = first;
-    ei = last;
+  function armTokenTimer() {
+    clearTimeout(tokenTimer);
+    var ms = tokenExpiresAt - Date.now() - 30000;
+    if (ms > 0 && ms < 2147483647) {
+      tokenTimer = setTimeout(function () {
+        clearSession("Your Google session expired. Connect again to continue.", true);
+      }, ms);
+    }
   }
-  return { si, ei };
-}
-
-function buildStaticSubscribers(raw, fullDates, si, ei) {
-  const s = raw.subscribers || {};
-  const current = s.current != null ? s.current : null;
-  const empty = {
-    dates: [], total: [], gained: [], lost: [], net: [],
-    current, netChange: 0, gainedTotal: 0, lostTotal: 0,
-    anchored: current !== null, updated: s.updated || null,
-  };
-  if (!fullDates.length || si > ei) return empty;
-  const total = (s.total || []).slice(si, ei + 1);
-  const gained = (s.gained || []).slice(si, ei + 1);
-  const lost = (s.lost || []).slice(si, ei + 1);
-  const net = gained.map((g, i) => g - lost[i]);
-  const gainedTotal = gained.reduce((a, b) => a + b, 0);
-  const lostTotal = lost.reduce((a, b) => a + b, 0);
-  return {
-    dates: fullDates, total, gained, lost, net,
-    current, netChange: gainedTotal - lostTotal, gainedTotal, lostTotal,
-    anchored: current !== null, updated: s.updated || null,
-  };
-}
-
-function buildStaticResponse(raw, params) {
-  const metric = params.metric === "watch" ? "watch" : "views";
-  const unit = metric === "watch" ? "hours" : "views";
-  const kind = ["all", "video", "shorts"].includes(params.type) ? params.type : "all";
-  const top = Math.max(1, Math.min(parseInt(params.top, 10) || 10, 40));
-  const videos = raw.videos || [];
-
-  let selected = videos;
-  if (kind === "video") selected = videos.filter((v) => v.type === "videoOnDemand");
-  else if (kind === "shorts") selected = videos.filter((v) => v.type === "shorts");
-
-  const { si, ei } = staticBounds(raw, selected, params.start, params.end);
-  const fullDates = [];
-  if (si <= ei) for (let i = si; i <= ei; i++) fullDates.push(raw.dates[i]);
-
-  const conv = (x) =>
-    metric === "watch" ? Math.round((x / 60) * 100) / 100 : Math.round(x);
-  const cumulative = (vids) => {
-    let run = 0;
-    const arr = [];
-    for (let i = si; i <= ei; i++) {
-      for (const v of vids) {
-        run += metric === "watch" ? v.minutes[i] : v.views[i];
+  function clearSession(message, isError) {
+    requestSeq += 1;
+    videoSeq += 1;
+    clearTimeout(loadTimer);
+    clearTimeout(tokenTimer);
+    tokenTimer = null;
+    accessToken = null;
+    tokenExpiresAt = 0;
+    currentData = null;
+    videoDailyCache = {};
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch (err) { /* ignore */ }
+    destroyCharts();
+    setBusy(false);
+    $("account").hidden = true;
+    $("accountAvatar").hidden = true;
+    $("app").hidden = true;
+    $("gate").hidden = false;
+    $("connect").disabled = PLACEHOLDER;
+    hideNotice();
+    hideError();
+    setGateStatus(message || defaultGateMessage(), !!isError);
+  }
+  function applyChannelStart(channel) {
+    var published = channel && channel.snippet && channel.snippet.publishedAt;
+    var start = pacificDate(published);
+    var end = $("endDate").value || pacificToday();
+    if (start && start <= end) {
+      $("startDate").value = start;
+    }
+  }
+  function enterApp() {
+    $("gate").hidden = true;
+    $("app").hidden = false;
+    $("account").hidden = false;
+    $("accountName").textContent = "Loading channel\u2026";
+    $("accountAvatar").hidden = true;
+    hideNotice();
+    hideError();
+    fetchChannel().then(function (channel) {
+      applyChannelStart(channel);
+      loadAll(channel);
+    }).catch(function (err) {
+      if (err.code === 401) {
+        clearSession("Your Google session expired. Connect again to continue.", true);
+        return;
       }
-      arr.push(conv(run));
-    }
-    return arr;
-  };
-
-  const ranked = selected.map((v) => ({ v, data: cumulative([v]) }));
-  ranked.sort(
-    (a, b) =>
-      (b.data.length ? b.data[b.data.length - 1] : 0) -
-      (a.data.length ? a.data[a.data.length - 1] : 0)
-  );
-
-  const chosen = ranked.slice(0, top);
-  const rest = ranked.slice(top);
-  const series = chosen.map(({ v, data }) => ({
-    label: v.title,
-    videoId: v.id,
-    type: v.type,
-    data,
-    total: data.length ? data[data.length - 1] : 0,
-    other: false,
-  }));
-
-  if (rest.length) {
-    const data = cumulative(rest.map((r) => r.v));
-    series.push({
-      label: "Other (" + rest.length + " videos)",
-      videoId: "",
-      type: "",
-      data,
-      total: data.length ? data[data.length - 1] : 0,
-      other: true,
+      loadAll();
     });
   }
 
-  let rawTotal = 0;
-  if (si <= ei) {
-    for (let i = si; i <= ei; i++) {
-      for (const v of selected) {
-        rawTotal += metric === "watch" ? v.minutes[i] : v.views[i];
+  function loadGis() {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+      return Promise.resolve();
+    }
+    if (gisLoader) return gisLoader;
+    gisLoader = new Promise(function (resolve, reject) {
+      var script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = function () { resolve(); };
+      script.onerror = function () {
+        gisLoader = null;
+        reject(new Error("Could not load Google sign-in. Check your connection or content blockers."));
+      };
+      document.head.appendChild(script);
+    });
+    return gisLoader;
+  }
+  function ensureTokenClient() {
+    return loadGis().then(function () {
+      var oauth2 = window.google && window.google.accounts && window.google.accounts.oauth2;
+      if (!oauth2) throw new Error("Google sign-in could not be initialized.");
+      if (!tokenClient) {
+        tokenClient = oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES.join(" "),
+          callback: onToken,
+          error_callback: onTokenError
+        });
       }
+      return tokenClient;
+    });
+  }
+  function onToken(response) {
+    if (!response || response.error) {
+      onTokenError(response || { message: "Google sign-in failed." });
+      return;
+    }
+    if (!response.access_token) {
+      onTokenError({ message: "Google did not return an access token." });
+      return;
+    }
+    storeToken(response);
+    $("connect").disabled = false;
+    enterApp();
+  }
+  function friendlyAuthError(err) {
+    var type = err && (err.type || err.error);
+    if (type === "popup_closed") return "The Google sign-in window was closed. Try again when ready.";
+    if (type === "popup_failed_to_open") return "Your browser blocked the Google sign-in window. Allow pop-ups and try again.";
+    if (type === "access_denied") return "Google sign-in was cancelled or access was denied. Try again when ready.";
+    return (err && (err.error_description || err.message)) || "Google sign-in could not start. Try again.";
+  }
+  function onTokenError(err) {
+    $("connect").disabled = PLACEHOLDER;
+    setGateStatus(friendlyAuthError(err), true);
+  }
+  function connect() {
+    if (PLACEHOLDER) return;
+    $("connect").disabled = true;
+    setGateStatus("Opening Google sign-in\u2026", false);
+    ensureTokenClient().then(function (client) {
+      client.requestAccessToken({ prompt: "select_account" });
+    }).catch(function (err) {
+      $("connect").disabled = false;
+      setGateStatus(friendlyAuthError(err), true);
+    });
+  }
+  function signOut() {
+    var token = accessToken;
+    clearSession("Signed out.", false);
+    if (token && window.google && window.google.accounts && window.google.accounts.oauth2) {
+      try {
+        window.google.accounts.oauth2.revoke(token, function () {});
+      } catch (err) { /* ignore revoke failures */ }
     }
   }
 
-  return {
-    dates: fullDates,
-    series,
-    total: conv(rawTotal),
-    videoCount: selected.length,
-    counts: staticCounts(videos),
-    updated: raw.updated,
-    source: "static",
-    videoSource: raw.videoSource || "cache",
-    filter: kind,
-    metric,
-    unit,
-    subscribers: buildStaticSubscribers(raw, fullDates, si, ei),
-  };
-}
+  function apiFetch(url) {
+    return fetch(url, {
+      headers: { Authorization: "Bearer " + accessToken },
+      cache: "no-store"
+    }).then(function (response) {
+      if (!response.ok) {
+        return response.json().catch(function () { return null; }).then(function (payload) {
+          var details = payload && payload.error;
+          var first = details && details.errors && details.errors[0];
+          var reason = (first && first.reason) || (details && details.status) || "";
+          var message = (details && details.message) || ("Google API request failed (" + response.status + ").");
+          var err = new Error(message);
+          err.code = response.status;
+          err.reason = reason;
+          throw err;
+        });
+      }
+      return response.json();
+    }, function () {
+      throw new Error("Network request failed. Check your connection and try again.");
+    });
+  }
+  function analytics(params) {
+    var url = new URL(ANALYTICS_URL);
+    url.searchParams.set("ids", "channel==MINE");
+    Object.keys(params).forEach(function (key) {
+      var value = params[key];
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, String(value));
+      }
+    });
+    return apiFetch(url.toString());
+  }
+  function dataApi(path, params) {
+    var url = new URL(DATA_URL + path);
+    Object.keys(params).forEach(function (key) {
+      var value = params[key];
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, String(value));
+      }
+    });
+    return apiFetch(url.toString());
+  }
+  function friendlyError(err) {
+    if (!err) return "Something went wrong.";
+    if (err.code === 403 && /quota|rateLimit/i.test(err.reason || "")) {
+      return "Google's API quota was reached. Wait a while and try again.";
+    }
+    if (err.code === 403 && /accessNotConfigured|SERVICE_DISABLED/i.test(err.reason || "")) {
+      return "A required Google API is not enabled for this deployment. See the README setup steps.";
+    }
+    if (err.code === 403) {
+      return "This Google account does not have permission to read analytics for a channel. Use an account that manages the channel.";
+    }
+    if (err.code === 401) return "Your Google session expired. Connect again.";
+    if (err.code === 400) {
+      return err.message + " The selected range or channel may not support this report.";
+    }
+    return err.message || "Could not load analytics.";
+  }
+  function typeFilterNotice(history) {
+    var err = history && (history.typeError || (history.videoHistory && history.videoHistory.typeError));
+    var detail = err ? (err.message || ("HTTP " + (err.code || err.status))) : "";
+    var message = "Content-type labels are unavailable for this channel, so the type filter could not be applied.";
+    return detail ? message + " Google API: " + detail : message;
+  }
 
-function csvEscape(value) {
-  const s = String(value);
-  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+  function fetchChannel() {
+    return dataApi("channels", { part: "snippet,statistics", mine: "true" }).then(function (data) {
+      return (data.items && data.items[0]) || null;
+    });
+  }
+  function fetchVideoMeta(ids) {
+    var unique = [];
+    var seen = {};
+    ids.forEach(function (id) {
+      if (id && !seen[id]) { seen[id] = true; unique.push(id); }
+    });
+    if (!unique.length) return Promise.resolve({});
+    return dataApi("videos", {
+      part: "snippet",
+      id: unique.slice(0, 50).join(","),
+      maxResults: 50
+    }).then(function (data) {
+      var map = {};
+      (data.items || []).forEach(function (item) {
+        var snippet = item.snippet || {};
+        var thumbs = snippet.thumbnails || {};
+        map[item.id] = {
+          title: snippet.title || item.id,
+          thumb: (thumbs.medium && thumbs.medium.url) || (thumbs.default && thumbs.default.url) || ""
+        };
+      });
+      return map;
+    });
+  }
+  function fetchSplit(start, end) {
+    return analytics({
+      startDate: start,
+      endDate: end,
+      metrics: "views,estimatedMinutesWatched",
+      dimensions: "day,creatorContentType",
+      sort: "day",
+      maxResults: 5000
+    }).then(function (res) {
+      return { rows: res.rows || [], error: null };
+    }).catch(function (err) {
+      if (err.code === 401) throw err;
+      return { rows: [], error: err };
+    });
+  }
+  function currentVideoOptions() {
+    var metricEl = $("videoMetric");
+    var typeEl = $("videoType");
+    var topEl = $("videoTop");
+    return {
+      metric: metricEl && metricEl.value === "watch" ? "watch" : "views",
+      type: typeEl && typeEl.value ? typeEl.value : "all",
+      top: Math.max(1, Math.min(20, Number(topEl && topEl.value) || 10))
+    };
+  }
 
-function buildStaticCsv(raw, start, end, kind) {
-  const videos = raw.videos || [];
-  let selected = videos;
-  if (kind === "video") selected = videos.filter((v) => v.type === "videoOnDemand");
-  else if (kind === "shorts") selected = videos.filter((v) => v.type === "shorts");
-  const { si, ei } = staticBounds(raw, selected, start, end);
-  const rows = [];
-  if (si <= ei) {
-    const totals = selected
-      .map((v) => {
-        let t = 0;
-        for (let i = si; i <= ei; i++) t += v.views[i];
-        return { v, t };
-      })
-      .sort((a, b) => b.t - a.t);
-    for (const { v } of totals) {
-      for (let i = si; i <= ei; i++) {
-        if (v.views[i] || v.minutes[i]) {
-          rows.push([raw.dates[i], v.id, v.title, v.type, v.views[i], v.minutes[i]]);
+  function rememberTypeError(err, attemptIndex) {
+    if (typeof window === "undefined") return;
+    window.__lastTypeError = {
+      attempt: attemptIndex + 1,
+      code: err && (err.code || err.status) || 0,
+      message: err && (err.message || err.text) || "unknown error"
+    };
+  }
+  function fetchTypeMap(start, end, ids) {
+    if (!ids.length) return Promise.resolve({});
+    var chunks = [];
+    var i;
+    for (i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+
+    function fromBulk(chunk) {
+      return analytics({
+        startDate: start,
+        endDate: end,
+        metrics: "views",
+        dimensions: "video,creatorContentType",
+        filters: "video==" + chunk.join(",")
+      }).then(function (res) {
+        var best = {};
+        (res.rows || []).forEach(function (r) {
+          var id = String(r[0]);
+          var type = contentFilterType(rawType(r[1]));
+          var views = num(r[2]);
+          if (!best[id] || views > best[id].views) best[id] = { type: type, views: views };
+        });
+        var map = {};
+        Object.keys(best).forEach(function (id) { map[id] = best[id].type; });
+        return map;
+      });
+    }
+
+    function fromSingle(id) {
+      return analytics({
+        startDate: start,
+        endDate: end,
+        metrics: "views",
+        dimensions: "creatorContentType",
+        filters: "video==" + id
+      }).then(function (res) {
+        var bestType = "";
+        var bestViews = -1;
+        (res.rows || []).forEach(function (r) {
+          var views = num(r[1]);
+          if (views > bestViews) {
+            bestViews = views;
+            bestType = contentFilterType(rawType(r[0]));
+          }
+        });
+        return { id: id, type: bestType };
+      }).catch(function (err) {
+        if (err.code === 401) throw err;
+        return { id: id, type: "" };
+      });
+    }
+
+    function singles() {
+      var map = {};
+      var singleIds = ids.slice(0, 200);
+      var index = 0;
+      function worker() {
+        if (index >= singleIds.length) return Promise.resolve();
+        var id = singleIds[index++];
+        return fromSingle(id).then(function (result) {
+          if (result.type) map[result.id] = result.type;
+          return worker();
+        });
+      }
+      var workers = [];
+      for (var w = 0; w < Math.min(8, singleIds.length); w += 1) workers.push(worker());
+      return Promise.all(workers).then(function () { return map; });
+    }
+
+    return Promise.all(chunks.map(fromBulk)).then(function (maps) {
+      var merged = {};
+      maps.forEach(function (map) {
+        Object.keys(map).forEach(function (id) { merged[id] = map[id]; });
+      });
+      return merged;
+    }).catch(function (err) {
+      if (err.code === 401) throw err;
+      return singles();
+    });
+  }
+  function fetchPlainRanking(start, end, metric, limit) {
+    var sort = metric === "watch" ? "-estimatedMinutesWatched" : "-views";
+    var pageSize = 200;
+    var rows = [];
+    var startIndex = 1;
+
+    function nextPage() {
+      return analytics({
+        startDate: start,
+        endDate: end,
+        metrics: "views,estimatedMinutesWatched",
+        dimensions: "video",
+        sort: sort,
+        startIndex: startIndex,
+        maxResults: pageSize
+      }).then(function (res) {
+        var page = res.rows || [];
+        page.forEach(function (r) {
+          rows.push({
+            id: String(r[0]),
+            type: "",
+            views: num(r[1]),
+            minutes: num(r[2])
+          });
+        });
+        startIndex += page.length;
+        if (page.length === pageSize && rows.length < limit) return nextPage();
+        return rows.slice(0, limit);
+      }).catch(function (err) {
+        if (err.code === 401) throw err;
+        return rows;
+      });
+    }
+
+    return nextPage();
+  }
+  function fetchTypedFallback(start, end, metric) {
+    return fetchPlainRanking(start, end, metric, 2000).then(function (rows) {
+      return fetchTypeMap(start, end, rows.map(function (r) { return r.id; })).then(function (typeMap) {
+        var typed = 0;
+        rows.forEach(function (row) {
+          row.type = typeMap[row.id] || "";
+          if (row.type && row.type !== "UNSPECIFIED") typed += 1;
+        });
+        return {
+          rows: rows,
+          typeUnavailable: typed === 0,
+          typeError: typed === 0 ? new Error("No creatorContentType rows were returned for the ranked videos.") : null
+        };
+      }).catch(function (err) {
+        if (err.code === 401) throw err;
+        rememberTypeError(err, 4);
+        return { rows: rows, typeUnavailable: true, typeError: err };
+      });
+    });
+  }
+  function fetchFilteredRanking(start, end, metric, type) {
+    var sort = metric === "watch" ? "-estimatedMinutesWatched" : "-views";
+    var wanted = type === "shorts" ? "SHORTS" : "VIDEO_ON_DEMAND";
+    return analytics({
+      startDate: start,
+      endDate: end,
+      metrics: "views,estimatedMinutesWatched",
+      dimensions: "video",
+      filters: "creatorContentType==" + wanted,
+      sort: sort,
+      maxResults: 200
+    }).then(function (res) {
+      var rows = (res.rows || []).map(function (r) {
+        return {
+          id: String(r[0]),
+          type: wanted,
+          views: num(r[1]),
+          minutes: num(r[2])
+        };
+      });
+      return { rows: rows, typeUnavailable: false, typeError: null };
+    });
+  }
+  function fetchVideoRanking(start, end, metric, type) {
+    if (type && type !== "all") {
+      return fetchFilteredRanking(start, end, metric, type).catch(function (err) {
+        if (err.code === 401) throw err;
+        rememberTypeError(err, 0);
+        if (err.code === 400) return fetchVideoRanking(start, end, metric, "all");
+        throw err;
+      });
+    }
+    var sort = metric === "watch" ? "-estimatedMinutesWatched" : "-views";
+    var selectedMetric = metric === "watch" ? "estimatedMinutesWatched" : "views";
+    var base = {
+      startDate: start,
+      endDate: end,
+      maxResults: 200
+    };
+    var attempts = [
+      { dimensions: "video,creatorContentType", metrics: "views,estimatedMinutesWatched", sort: sort, typeUnavailable: false, idIndex: 0, typeIndex: 1, viewsIndex: 2, minutesIndex: 3 },
+      { dimensions: "creatorContentType,video", metrics: "views,estimatedMinutesWatched", sort: sort, typeUnavailable: false, idIndex: 1, typeIndex: 0, viewsIndex: 2, minutesIndex: 3 },
+      { dimensions: "video,creatorContentType", metrics: selectedMetric, sort: sort, typeUnavailable: false, idIndex: 0, typeIndex: 1, viewsIndex: metric === "watch" ? null : 2, minutesIndex: metric === "watch" ? 2 : null }
+    ];
+
+    function attempt(index) {
+      var options = attempts[index];
+      return analytics(Object.assign({}, base, {
+        dimensions: options.dimensions,
+        metrics: options.metrics,
+        sort: options.sort
+      })).then(function (res) {
+        var rows = (res.rows || []).map(function (r) {
+          return {
+            id: String(r[options.idIndex]),
+            type: contentFilterType(rawType(r[options.typeIndex])),
+            views: options.viewsIndex == null ? 0 : num(r[options.viewsIndex]),
+            minutes: options.minutesIndex == null ? 0 : num(r[options.minutesIndex])
+          };
+        });
+        return { rows: rows, typeUnavailable: false, typeError: null };
+      }).catch(function (err) {
+        if (err.code === 401) throw err;
+        rememberTypeError(err, index);
+        if (err.code === 400) {
+          if (index < attempts.length - 1) return attempt(index + 1);
+          return fetchTypedFallback(start, end, metric);
+        }
+        throw err;
+      });
+    }
+
+    return attempt(0);
+  }
+
+  function fetchVideoDailyForId(start, end, id) {
+    var key = start + "|" + end + "|" + id;
+    if (videoDailyCache[key]) return Promise.resolve(videoDailyCache[key]);
+    var rows = [];
+    var startIndex = 1;
+    var pageSize = 5000;
+    var guard = 0;
+
+    function nextPage() {
+      return analytics({
+        startDate: start,
+        endDate: end,
+        metrics: "views,estimatedMinutesWatched",
+        dimensions: "day",
+        filters: "video==" + id,
+        sort: "day",
+        startIndex: startIndex,
+        maxResults: pageSize
+      }).then(function (res) {
+        var page = res.rows || [];
+        rows = rows.concat(page);
+        guard += 1;
+        if (page.length === pageSize && guard < 20) {
+          startIndex += page.length;
+          return nextPage();
+        }
+        return rows;
+      });
+    }
+
+    return nextPage().then(function (result) {
+      videoDailyCache[key] = result;
+      return result;
+    });
+  }
+
+  function fetchVideoHistory(start, end, opts) {
+    return fetchVideoRanking(start, end, opts.metric, opts.type).then(function (ranking) {
+      var rows = ranking.rows.slice();
+      if (opts.type !== "all" && !ranking.typeUnavailable) {
+        var wanted = opts.type === "shorts" ? "SHORTS" : "VIDEO_ON_DEMAND";
+        rows = rows.filter(function (video) { return contentFilterType(video.type) === wanted; });
+      }
+      rows = rows.slice(0, opts.top);
+      var errors = [];
+      return Promise.all(rows.map(function (video) {
+        return fetchVideoDailyForId(start, end, video.id).then(function (dailyRows) {
+          return { id: video.id, rows: dailyRows };
+        }).catch(function (err) {
+          if (err.code === 401) throw err;
+          errors.push(err);
+          return { id: video.id, rows: [] };
+        });
+      })).then(function (daily) {
+        return {
+          rows: rows,
+          allRows: ranking.rows,
+          daily: daily,
+          opts: opts,
+          typeUnavailable: ranking.typeUnavailable,
+          typeError: ranking.typeError,
+          error: null,
+          dailyError: errors.length ? errors[0] : null
+        };
+      });
+    }).catch(function (err) {
+      if (err.code === 401) throw err;
+      return {
+        rows: [],
+        allRows: [],
+        daily: [],
+        opts: opts,
+        typeUnavailable: false,
+        typeError: null,
+        error: err,
+        dailyError: null
+      };
+    });
+  }
+
+  function attachVideoMeta(history, meta) {
+    history.meta = meta || {};
+    return history;
+  }
+
+  function buildModel(input) {
+    var rawDaily = (input.totals.rows || []).map(function (r) {
+      return {
+        date: String(r[0]),
+        views: num(r[1]),
+        minutes: num(r[2]),
+        gained: num(r[3]),
+        lost: num(r[4])
+      };
+    });
+    var hasData = rawDaily.length > 0;
+    var daily = [];
+    if (hasData) {
+      var byDate = {};
+      rawDaily.forEach(function (row) { byDate[row.date] = row; });
+      var day = input.start;
+      var guard = 0;
+      while (day <= input.end && guard < 4000) {
+        var found = byDate[day];
+        daily.push(found ? {
+          date: found.date,
+          views: found.views,
+          minutes: found.minutes,
+          gained: found.gained,
+          lost: found.lost
+        } : { date: day, views: 0, minutes: 0, gained: 0, lost: 0 });
+        day = addDays(day, 1);
+        guard += 1;
+      }
+    }
+
+    var splitMap = {};
+    (input.split || []).forEach(function (row) {
+      var date = String(row[0]);
+      var bucket = splitBucket(rawType(row[1]));
+      var entry = splitMap[date] || {
+        SHORTS: 0, SHORTS_MIN: 0,
+        VIDEO_ON_DEMAND: 0, VIDEO_ON_DEMAND_MIN: 0,
+        OTHER: 0, OTHER_MIN: 0
+      };
+      entry[bucket] += num(row[2]);
+      entry[bucket + "_MIN"] += num(row[3]);
+      splitMap[date] = entry;
+    });
+    var splitAvailable = (input.split || []).length > 0 && daily.length > 0;
+
+    var shorts = daily.map(function (r) {
+      return (splitMap[r.date] && splitMap[r.date].SHORTS) || 0;
+    });
+    var videos = daily.map(function (r) {
+      return (splitMap[r.date] && splitMap[r.date].VIDEO_ON_DEMAND) || 0;
+    });
+    var other = daily.map(function (r, i) {
+      var base = (splitMap[r.date] && splitMap[r.date].OTHER) || 0;
+      var residual = r.views - (shorts[i] + videos[i] + base);
+      return Math.max(0, base + residual);
+    });
+    var shortsMinutes = daily.map(function (r) {
+      return (splitMap[r.date] && splitMap[r.date].SHORTS_MIN) || 0;
+    });
+    var videosMinutes = daily.map(function (r) {
+      return (splitMap[r.date] && splitMap[r.date].VIDEO_ON_DEMAND_MIN) || 0;
+    });
+    var otherMinutes = daily.map(function (r, i) {
+      var base = (splitMap[r.date] && splitMap[r.date].OTHER_MIN) || 0;
+      var residual = r.minutes - (shortsMinutes[i] + videosMinutes[i] + base);
+      return Math.max(0, base + residual);
+    });
+
+    var cumulativeOf = function (values) {
+      var total = 0;
+      return values.map(function (value) {
+        total += value;
+        return total;
+      });
+    };
+    var cumulative = cumulativeOf(daily.map(function (r) { return r.views; }));
+    var cumulativeMinutes = cumulativeOf(daily.map(function (r) { return r.minutes; }));
+    var cumulativeShorts = cumulativeOf(shorts);
+    var cumulativeVideos = cumulativeOf(videos);
+    var cumulativeShortsMinutes = cumulativeOf(shortsMinutes);
+    var cumulativeVideosMinutes = cumulativeOf(videosMinutes);
+
+    var seen = {};
+    var top = (input.top || []).filter(function (v) {
+      if (!v.id || seen[v.id]) return false;
+      seen[v.id] = true;
+      return true;
+    }).slice(0, 25).map(function (v) {
+      var meta = input.meta[v.id] || {};
+      return {
+        id: v.id,
+        type: v.type,
+        views: v.views,
+        minutes: v.minutes,
+        title: meta.title || v.id,
+        thumb: meta.thumb || ("https://i.ytimg.com/vi/" + encodeURIComponent(v.id) + "/mqdefault.jpg")
+      };
+    });
+
+    var channel = input.channel;
+    var stats = (channel && channel.statistics) || {};
+    var currentSubs = stats.hiddenSubscriberCount
+      ? null
+      : (stats.subscriberCount != null ? Number(stats.subscriberCount) : null);
+
+    var totalViews = daily.reduce(function (sum, r) { return sum + r.views; }, 0);
+    var totalMinutes = daily.reduce(function (sum, r) { return sum + r.minutes; }, 0);
+    var gained = daily.reduce(function (sum, r) { return sum + r.gained; }, 0);
+    var lost = daily.reduce(function (sum, r) { return sum + r.lost; }, 0);
+    var netSubs = gained - lost;
+    var cumulativeNet = 0;
+    var subscriberNetCumulative = daily.map(function (r) {
+      cumulativeNet += r.gained - r.lost;
+      return cumulativeNet;
+    });
+    var subscriberTotal = null;
+    if (currentSubs != null) {
+      var startTotal = currentSubs - netSubs;
+      subscriberTotal = subscriberNetCumulative.map(function (value) {
+        return Math.max(0, Math.round(startTotal + value));
+      });
+    }
+
+    var model = {
+      start: input.start,
+      end: input.end,
+      daily: daily,
+      hasData: hasData,
+      shorts: shorts,
+      videos: videos,
+      other: other,
+      shortsMinutes: shortsMinutes,
+      videosMinutes: videosMinutes,
+      otherMinutes: otherMinutes,
+      cumulative: cumulative,
+      cumulativeMinutes: cumulativeMinutes,
+      cumulativeShorts: cumulativeShorts,
+      cumulativeVideos: cumulativeVideos,
+      cumulativeShortsMinutes: cumulativeShortsMinutes,
+      cumulativeVideosMinutes: cumulativeVideosMinutes,
+      splitAvailable: splitAvailable,
+      top: top,
+      topError: input.topError,
+      channel: channel,
+      currentSubs: currentSubs,
+      totalViews: totalViews,
+      totalMinutes: totalMinutes,
+      gained: gained,
+      lost: lost,
+      netSubs: netSubs,
+      subscriberNetCumulative: subscriberNetCumulative,
+      subscriberTotal: subscriberTotal,
+      avgViews: daily.length ? totalViews / daily.length : 0,
+      firstDate: daily.length ? daily[0].date : null,
+      lastDate: daily.length ? daily[daily.length - 1].date : null
+    };
+    if (input.videoHistory) model.videoChart = buildVideoChartData(model, input.videoHistory);
+    return model;
+  }
+
+  function buildVideoChartData(model, history) {
+    var opts = history.opts || currentVideoOptions();
+    var metric = opts.metric === "watch" ? "watch" : "views";
+    var unit = metric === "watch" ? "hours" : "views";
+    var labels = model.daily.map(function (row) { return row.date; });
+    var byId = {};
+    (history.daily || []).forEach(function (entry) {
+      var map = {};
+      (entry.rows || []).forEach(function (row) {
+        map[String(row[0])] = { views: num(row[1]), minutes: num(row[2]) };
+      });
+      byId[entry.id] = map;
+    });
+    var series = (history.rows || []).map(function (video, index) {
+      var running = 0;
+      var data = labels.map(function (date) {
+        var row = byId[video.id] && byId[video.id][date];
+        running += row ? (metric === "watch" ? row.minutes : row.views) : 0;
+        return metric === "watch" ? Math.round((running / 60) * 100) / 100 : running;
+      });
+      var meta = (history.meta && history.meta[video.id]) || {};
+      return {
+        id: video.id,
+        title: meta.title || video.id,
+        label: shortTitle(meta.title || video.id),
+        type: video.type,
+        color: PALETTE[index % PALETTE.length],
+        data: data,
+        total: data.length ? data[data.length - 1] : 0
+      };
+    });
+
+    var allRows = history.allRows || history.rows || [];
+    var counts = { all: allRows.length, video: 0, shorts: 0 };
+    allRows.forEach(function (video) {
+      if (video.type === "SHORTS") counts.shorts += 1;
+      else if (video.type === "VIDEO_ON_DEMAND") counts.video += 1;
+    });
+    var videoCount = opts.type === "video"
+      ? counts.video
+      : (opts.type === "shorts" ? counts.shorts : counts.all);
+    if (opts.type !== "all" && history.typeUnavailable) videoCount = allRows.length;
+
+    var total = null;
+    if (metric === "watch") {
+      if (opts.type === "all") total = model.cumulativeMinutes.slice();
+      else if (opts.type === "video" && model.splitAvailable) total = model.cumulativeVideosMinutes.slice();
+      else if (opts.type === "shorts" && model.splitAvailable) total = model.cumulativeShortsMinutes.slice();
+      if (total) {
+        total = total.map(function (value) { return Math.round((value / 60) * 100) / 100; });
+      }
+    } else if (opts.type === "all") {
+      total = model.cumulative.slice();
+    } else if (opts.type === "video" && model.splitAvailable) {
+      total = model.cumulativeVideos.slice();
+    } else if (opts.type === "shorts" && model.splitAvailable) {
+      total = model.cumulativeShorts.slice();
+    }
+
+    if (!total) {
+      total = labels.map(function (_, index) {
+        return series.reduce(function (sum, item) {
+          return sum + (item.data[index] || 0);
+        }, 0);
+      });
+    }
+
+    var other = null;
+    if (series.length) {
+      other = total.map(function (totalValue, index) {
+        var selected = series.reduce(function (sum, item) {
+          return sum + (item.data[index] || 0);
+        }, 0);
+        return Math.max(0, Math.round((totalValue - selected) * 100) / 100);
+      });
+      if (!other.some(function (value) { return value > 0; })) other = null;
+    }
+
+    return {
+      labels: labels,
+      series: series,
+      other: other,
+      total: total,
+      metric: metric,
+      unit: unit,
+      opts: opts,
+      counts: counts,
+      videoCount: videoCount,
+      otherCount: Math.max(0, videoCount - series.length),
+      error: history.error || null,
+      dailyError: history.dailyError || null,
+      typeUnavailable: !!history.typeUnavailable
+    };
+  }
+
+  function setBusy(busy) {
+    $("refresh").disabled = busy;
+    $("exportCsv").disabled = busy || !currentData || !currentData.hasData;
+    ["videoMetric", "videoType", "videoTop"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.disabled = busy;
+    });
+    document.body.classList.toggle("is-busy", busy);
+  }
+  function setVideoBusy(busy) {
+    ["videoMetric", "videoType", "videoTop"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.disabled = busy;
+    });
+    var card = $("videoChartCard");
+    if (card) card.classList.toggle("is-busy", busy);
+  }
+  function destroyCharts() {
+    Object.keys(charts).forEach(function (key) {
+      if (charts[key]) charts[key].destroy();
+    });
+    charts = {};
+  }
+  function makeChart(id, config) {
+    var canvas = $(id);
+    if (!canvas) return;
+    if (charts[id]) {
+      charts[id].destroy();
+      delete charts[id];
+    }
+    charts[id] = new Chart(canvas, config);
+  }
+  function baseOptions(model, opts) {
+    opts = opts || {};
+    var options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          display: !!opts.legend,
+          labels: { color: "#c9ced8", boxWidth: 12, boxHeight: 2, usePointStyle: true, font: { size: 11 } }
+        },
+        tooltip: {
+          backgroundColor: "#0b0d11",
+          borderColor: "#2a2f3a",
+          borderWidth: 1,
+          padding: 10,
+          titleColor: "#f2f4f8",
+          bodyColor: "#c9ced8",
+          callbacks: {
+            title: function (items) {
+              var i = items[0] ? items[0].dataIndex : null;
+              return i != null && model.daily[i] ? model.daily[i].date : "";
+            },
+            label: opts.tooltipLabel || function (item) {
+              return fmtInt(item.parsed.y);
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: !!opts.stacked,
+          ticks: {
+            color: "#8b93a1",
+            maxTicksLimit: 10,
+            maxRotation: 0,
+            autoSkip: true,
+            callback: function (value) {
+              var label = this.getLabelForValue(value);
+              return label.length > 5 ? label.slice(5) : label;
+            }
+          },
+          grid: { display: false },
+          border: { display: false }
+        },
+        y: {
+          stacked: !!opts.stacked,
+          beginAtZero: opts.beginAtZero !== false,
+          min: opts.min == null ? undefined : opts.min,
+          ticks: {
+            color: "#8b93a1",
+            callback: function (value) { return compactFmt.format(value); }
+          },
+          grid: { color: "rgba(255,255,255,0.06)" },
+          border: { display: false }
         }
       }
+    };
+    if (opts.tooltipFooter) {
+      options.plugins.tooltip.callbacks.footer = opts.tooltipFooter;
     }
+    return options;
   }
-  const lines = ["Date,Video ID,Video title,Type,Views,Minutes"];
-  for (const r of rows) lines.push(r.map(csvEscape).join(","));
-  return lines.join("\n");
-}
 
-async function loadRaw(forceReload) {
-  if (!rawCache || forceReload) {
-    const url = "data.json" + (forceReload ? "?v=" + Date.now() : "");
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error("Could not load data.json");
-    rawCache = await res.json();
+  function renderDailyChart(model) {
+    var video = model.videoChart;
+    var metric = video ? video.metric : "views";
+    var metricLabel = metric === "watch" ? "watch time" : "views";
+    var labels = video ? video.labels : [];
+    var total = video ? video.total : [];
+    var daily = total.map(function (value, index) {
+      return index ? Math.round((value - total[index - 1]) * 100) / 100 : value;
+    });
+    var scope = video && video.opts.type !== "all" ? typeFilterLabel(video.opts.type) : "all videos";
+    $("dailyTitle").textContent = "Daily " + metricLabel + " (" + scope + ")";
+    makeChart("viewsChart", {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: metricLabel + " per day",
+          data: daily,
+          backgroundColor: "rgba(59,160,255,0.7)",
+          borderWidth: 0,
+          borderRadius: 2,
+          maxBarThickness: 18
+        }]
+      },
+      options: baseOptions(model, {
+        tooltipLabel: function (item) {
+          return metric === "watch" ? fmtHours(item.parsed.y) : fmtInt(item.parsed.y) + " views";
+        }
+      })
+    });
   }
-  return rawCache;
-}
 
-function setStatus(msg, isErr) {
-  const el = $("status");
-  el.textContent = msg;
-  el.className = "status" + (isErr ? " err" : "");
-}
-
-async function loadData(forceRefresh) {
-  $("refresh").disabled = true;
-  if (forceRefresh) {
-    setStatus(STATIC ? "Reloading snapshot..." : "Fetching from YouTube (may take a minute)...");
-  } else {
-    setStatus("Loading...");
+  function renderTotalChart(model) {
+    var video = model.videoChart;
+    var metric = video ? video.metric : "views";
+    var metricLabel = metric === "watch" ? "watch time" : "views";
+    var labels = video ? video.labels : [];
+    var total = video ? video.total : [];
+    $("totalTitle").textContent = "Channel total cumulative " + metricLabel;
+    makeChart("cumulativeChart", {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Total cumulative " + metricLabel,
+          data: total,
+          borderColor: "#ff3b5c",
+          backgroundColor: "#ff3b5c",
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          tension: 0.15,
+          fill: false
+        }]
+      },
+      options: baseOptions(model, {
+        tooltipLabel: function (item) {
+          return metric === "watch" ? fmtHours(item.parsed.y) : fmtInt(item.parsed.y) + " views";
+        }
+      })
+    });
   }
-  const params = {
-    start: $("start").value || "",
-    end: $("end").value || "",
-    top: $("top").value,
-    type: $("type").value,
-    metric: $("metric").value,
-  };
-  try {
-    let data;
-    if (STATIC) {
-      const raw = await loadRaw(forceRefresh);
-      data = buildStaticResponse(raw, params);
-    } else {
-      const q = new URLSearchParams();
-      if (forceRefresh) q.set("refresh", "1");
-      q.set("start", params.start);
-      q.set("end", params.end);
-      q.set("top", params.top);
-      q.set("type", params.type);
-      q.set("metric", params.metric);
-      const res = await fetch("/api/data?" + q.toString());
-      data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
+
+  function renderVideoChart(model) {
+    var video = model.videoChart;
+    var metric = video ? video.metric : "views";
+    var metricLabel = metric === "watch" ? "watch time" : "views";
+    $("videoChartTitle").textContent = "Cumulative " + metricLabel + " per video";
+    if (!video || !video.series.length) {
+      makeChart("videoChart", {
+        type: "line",
+        data: { labels: video ? video.labels : [], datasets: [] },
+        options: baseOptions(model, { legend: true })
+      });
+      return;
     }
-    render(data);
-    if (STATIC) {
-      setStatus("Showing snapshot from " + new Date(data.updated).toLocaleString());
-    } else {
-      setStatus(data.source === "live" ? "Live data loaded" : "Showing cached data");
-    }
-  } catch (err) {
-    setStatus("Error: " + err.message, true);
-  } finally {
-    $("refresh").disabled = false;
-  }
-}
 
-function render(data) {
-  const unit = data.unit || "views";
-  const metricLabel = unit === "hours" ? "watch time" : "views";
-  $("kpiTotalLabel").textContent = "Total " + metricLabel;
-  $("kpiTotal").textContent = fmtMetric(data.total, unit);
-  $("kpiVideos").textContent = fmt(data.videoCount);
-  $("kpiDays").textContent = fmt(data.dates.length);
-  $("kpiEnd").textContent = data.dates.length ? data.dates[data.dates.length - 1] : "-";
-  $("updated").textContent = "Last updated: " + new Date(data.updated).toLocaleString();
-  $("chartTitle").textContent = "Cumulative " + metricLabel + " per video";
-  $("totalTitle").textContent = "Channel total cumulative " + metricLabel;
-  $("dailyTitle").textContent = "Daily " + metricLabel + " (all videos)";
-  $("listTitle").textContent = "Top videos by " + metricLabel;
-
-  const counts = data.counts || {};
-  const setOption = (val, text) => {
-    const opt = $("type").querySelector(`option[value="${val}"]`);
-    if (opt) opt.textContent = text;
-  };
-  setOption("all", "All (" + (counts.all || 0) + ")");
-  setOption("video", "Videos (" + (counts.video || 0) + ")");
-  setOption("shorts", "Shorts (" + (counts.shorts || 0) + ")");
-
-  const notice = $("notice");
-  if (data.videoSource === "csv") {
-    notice.style.display = "block";
-    notice.textContent = "Shorts not included yet - enable the YouTube Data API v3 in your Google Cloud project, then click Refresh from YouTube.";
-  } else if ($("type").value === "shorts" && !data.videoCount) {
-    notice.style.display = "block";
-    notice.textContent = "No Shorts data in this range yet. Click Refresh from YouTube to fetch the latest.";
-  } else {
-    notice.style.display = "none";
-  }
-
-  if (!$("start").value && data.dates.length) $("start").value = data.dates[0];
-  if (!$("end").value && data.dates.length) $("end").value = data.dates[data.dates.length - 1];
-
-  const datasets = data.series.map((s, i) => ({
-    label: s.label,
-    data: s.data,
-    borderColor: s.other ? OTHER_COLOR : PALETTE[i % PALETTE.length],
-    backgroundColor: s.other ? OTHER_COLOR : PALETTE[i % PALETTE.length],
-    borderWidth: s.other ? 1.5 : 2,
-    borderDash: s.other ? [6, 4] : [],
-    pointRadius: 0,
-    pointHitRadius: 8,
-    tension: 0.15,
-    fill: false,
-  }));
-
-  const labels = data.dates.map((d) => d.slice(0, 7));
-  if (chart) chart.destroy();
-  chart = new Chart($("chart"), {
-    type: "line",
-    data: { labels, datasets },
-    options: baseOptions(data.dates, true, unit),
-  });
-
-  const totalCumulative = data.dates.map((_, i) =>
-    data.series.reduce((sum, s) => sum + (s.data[i] || 0), 0)
-  );
-  const daily = totalCumulative.map((v, i) => (i ? v - totalCumulative[i - 1] : v));
-
-  if (totalChart) totalChart.destroy();
-  totalChart = new Chart($("totalChart"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: "Total cumulative " + metricLabel,
-        data: totalCumulative,
-        borderColor: "#ff3b5c",
-        backgroundColor: "#ff3b5c",
+    var datasets = video.series.map(function (item) {
+      return {
+        label: item.label,
+        fullTitle: item.title,
+        data: item.data,
+        borderColor: item.color,
+        backgroundColor: item.color,
         borderWidth: 2,
         pointRadius: 0,
         pointHitRadius: 8,
         tension: 0.15,
-        fill: false,
-      }],
-    },
-    options: baseOptions(data.dates, false, unit),
-  });
-
-  if (dailyChart) dailyChart.destroy();
-  dailyChart = new Chart($("dailyChart"), {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: metricLabel + " per day",
-        data: daily,
-        backgroundColor: "rgba(59,160,255,0.7)",
-        borderWidth: 0,
-        borderRadius: 2,
-      }],
-    },
-    options: baseOptions(data.dates, false, unit),
-  });
-
-  const subs = data.subscribers || {};
-  const subsDates = subs.dates || [];
-  const subsLabels = subsDates.map((d) => d.slice(0, 7));
-  $("kpiSubs").textContent = subs.current != null ? fmt(subs.current) : "-";
-  const netEl = $("kpiSubsNet");
-  if (subsDates.length) {
-    const n = Number(subs.netChange || 0);
-    netEl.textContent = (n >= 0 ? "+" : "") + fmt(n) + " in range";
-    netEl.style.color = n < 0 ? "#ff6b6b" : "#3bffb0";
-  } else {
-    netEl.textContent = "";
-  }
-  $("subsTitle").textContent = subs.anchored ? "Subscriber total" : "Net subscribers gained";
-
-  if (subsChart) subsChart.destroy();
-  subsChart = new Chart($("subsChart"), {
-    type: "line",
-    data: {
-      labels: subsLabels,
-      datasets: [{
-        label: subs.anchored ? "Total subscribers" : "Net subscribers gained",
-        data: subs.total || [],
-        borderColor: "#3bffb0",
-        backgroundColor: "#3bffb0",
-        borderWidth: 2,
+        fill: false
+      };
+    });
+    if (video.other) {
+      var otherLabel = video.otherCount > 0
+        ? "Other (" + video.otherCount + " videos)"
+        : "Other videos";
+      datasets.push({
+        label: otherLabel,
+        fullTitle: otherLabel,
+        data: video.other,
+        borderColor: OTHER_COLOR,
+        backgroundColor: OTHER_COLOR,
+        borderWidth: 1.5,
+        borderDash: [6, 4],
         pointRadius: 0,
         pointHitRadius: 8,
         tension: 0.15,
-        fill: false,
-      }],
-    },
-    options: baseOptions(subsDates, false, "views"),
-  });
+        fill: false
+      });
+    }
 
-  if (subsDailyChart) subsDailyChart.destroy();
-  subsDailyChart = new Chart($("subsDailyChart"), {
-    type: "bar",
-    data: {
-      labels: subsLabels,
-      datasets: [
-        {
-          label: "Gained",
-          data: subs.gained || [],
-          backgroundColor: "rgba(59,255,176,0.75)",
-          borderRadius: 2,
-          borderWidth: 0,
-        },
-        {
-          label: "Lost",
-          data: subs.lost || [],
-          backgroundColor: "rgba(255,107,107,0.75)",
-          borderRadius: 2,
-          borderWidth: 0,
-        },
-      ],
-    },
-    options: baseOptions(subsDates, true, "views"),
-  });
-
-  const all = data.series.filter((s) => !s.other).slice(0, 10);
-  const maxTotal = Math.max(...all.map((s) => s.total), 1);
-  $("videoList").innerHTML = all.map((s, i) => {
-    const color = PALETTE[i % PALETTE.length];
-    const w = Math.max(2, (s.total / maxTotal) * 100);
-    const badge = s.type === "shorts"
-      ? '<span class="badge short">SHORT</span>'
-      : (s.type === "videoOnDemand" ? '<span class="badge video">VIDEO</span>' : "");
-    return `<div class="video-item">
-      <div class="video-title">${badge}${escapeHtml(s.label)}</div>
-      <div class="video-meta"><span>${s.videoId}</span><span>${fmtMetric(s.total, unit)}</span></div>
-      <div class="bar"><div style="width:${w}%;background:${color}"></div></div>
-    </div>`;
-  }).join("") || '<div class="empty">No data</div>';
-}
-
-function baseOptions(dates, showLegend, unit) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: "index", intersect: false },
-    plugins: {
-      legend: {
-        display: showLegend,
-        labels: { color: "#e8eaed", boxWidth: 14, boxHeight: 3, font: { size: 11 } },
-      },
-      tooltip: {
-        callbacks: {
-          title: (items) => dates[items[0].dataIndex],
-          label: (item) =>
-            (item.dataset.label ? item.dataset.label + ": " : "") + fmtMetric(item.parsed.y, unit),
-        },
-      },
-    },
-    scales: {
-      x: {
-        ticks: { color: "#9aa0aa", maxTicksLimit: 12, maxRotation: 0 },
-        grid: { color: "rgba(255,255,255,0.05)" },
-      },
-      y: {
-        ticks: { color: "#9aa0aa", callback: (v) => compact(v) },
-        grid: { color: "rgba(255,255,255,0.07)" },
-        beginAtZero: true,
-      },
-    },
-  };
-}
-
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-function downloadChart(name, baseName) {
-  const refs = { chart, totalChart, dailyChart, subsChart, subsDailyChart };
-  const c = refs[name];
-  if (!c) return;
-  const src = c.canvas;
-  const pad = 16;
-  const out = document.createElement("canvas");
-  out.width = src.width + pad * 2;
-  out.height = src.height + pad * 2;
-  const ctx = out.getContext("2d");
-  ctx.fillStyle = "#0f1115";
-  ctx.fillRect(0, 0, out.width, out.height);
-  ctx.drawImage(src, pad, pad);
-  const a = document.createElement("a");
-  a.href = out.toDataURL("image/png");
-  a.download = baseName + ".png";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
-if (STATIC) $("refresh").textContent = "Reload snapshot";
-$("downloadCsv").addEventListener("click", async () => {
-  if (!STATIC) {
-    const params = new URLSearchParams();
-    params.set("start", $("start").value || "");
-    params.set("end", $("end").value || "");
-    params.set("type", $("type").value);
-    const a = document.createElement("a");
-    a.href = "/api/export.csv?" + params.toString();
-    a.download = "";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    return;
+    makeChart("videoChart", {
+      type: "line",
+      data: { labels: video.labels, datasets: datasets },
+      options: baseOptions(model, {
+        legend: true,
+        tooltipLabel: function (item) {
+          var label = item.dataset.fullTitle || item.dataset.label;
+          return label + ": " + (metric === "watch" ? fmtHours(item.parsed.y) : fmtInt(item.parsed.y) + " views");
+        }
+      })
+    });
   }
-  try {
-    const raw = await loadRaw(false);
-    const startVal = $("start").value;
-    const endVal = $("end").value;
-    const start = startVal || raw.dates[0];
-    const end = endVal || raw.dates[raw.dates.length - 1];
-    const kind = $("type").value;
-    const csv = buildStaticCsv(raw, startVal, endVal, kind);
-    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `youtube_dashboard_${start}_to_${end}_${kind}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    setStatus("Error: " + err.message, true);
+
+  function renderSubsTotalChart(model) {
+    var anchored = model.subscriberTotal != null;
+    var data = anchored ? model.subscriberTotal : model.subscriberNetCumulative;
+    var labels = model.daily.map(function (r) { return r.date; });
+    $("subsTotalTitle").textContent = anchored ? "Subscriber total" : "Net subscribers gained";
+    makeChart("subsTotalChart", {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: anchored ? "Total subscribers" : "Net subscribers gained",
+          data: data,
+          borderColor: "#3bffb0",
+          backgroundColor: "#3bffb0",
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          tension: 0.15,
+          fill: false
+        }]
+      },
+      options: baseOptions(model, {
+        beginAtZero: anchored,
+        min: anchored ? 0 : undefined,
+        tooltipLabel: function (item) {
+          return (anchored ? "Total: " : "Net: ") +
+            (anchored ? fmtInt(item.parsed.y) : fmtSigned(item.parsed.y)) + " subscribers";
+        }
+      })
+    });
   }
-});
-document.querySelectorAll("button[data-chart]").forEach((btn) => {
-  btn.addEventListener("click", () => downloadChart(btn.dataset.chart, btn.dataset.name));
-});
-$("refresh").addEventListener("click", () => loadData(true));
-$("metric").addEventListener("change", () => loadData(false));
-$("type").addEventListener("change", () => loadData(false));
-$("top").addEventListener("change", () => loadData(false));
-$("start").addEventListener("change", () => loadData(false));
-$("end").addEventListener("change", () => loadData(false));
-loadData(false);
+
+  function renderSubsChart(model) {
+    var labels = model.daily.map(function (r) { return r.date; });
+    makeChart("subsChart", {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Gained",
+            data: model.daily.map(function (r) { return r.gained; }),
+            backgroundColor: "rgba(59,255,176,0.75)",
+            borderRadius: 2,
+            maxBarThickness: 14
+          },
+          {
+            label: "Lost",
+            data: model.daily.map(function (r) { return r.lost; }),
+            backgroundColor: "rgba(255,107,107,0.75)",
+            borderRadius: 2,
+            maxBarThickness: 14
+          }
+        ]
+      },
+      options: baseOptions(model, {
+        legend: true,
+        tooltipLabel: function (item) {
+          return fmtInt(item.parsed.y) + (item.dataset.label === "Gained" ? " gained" : " lost");
+        },
+        tooltipFooter: function (items) {
+          var i = items[0] ? items[0].dataIndex : null;
+          if (i == null || !model.daily[i]) return "";
+          return "Net: " + fmtSigned(model.daily[i].gained - model.daily[i].lost);
+        }
+      })
+    });
+  }
+
+  function updateTypeOptions(video) {
+    if (!video) return;
+    var counts = video.counts || {};
+    var setOption = function (value, text) {
+      var option = $("videoType").querySelector('option[value="' + value + '"]');
+      if (option) option.textContent = text;
+    };
+    setOption("all", "All (" + (counts.all || 0) + ")");
+    setOption("video", "Videos (" + (counts.video || 0) + ")");
+    setOption("shorts", "Shorts (" + (counts.shorts || 0) + ")");
+  }
+
+  function renderVideoList(model) {
+    var video = model.videoChart;
+    var list = $("videoList");
+    if (!video || !video.series.length) {
+      list.innerHTML = '<div class="empty">' +
+        (video && video.error ? "Top videos could not be loaded for this range." : "No data") +
+      "</div>";
+      return;
+    }
+    var metric = video.metric;
+    var all = video.series.slice(0, 10);
+    var maxTotal = Math.max.apply(null, all.map(function (item) { return item.total; }).concat([1]));
+    list.innerHTML = all.map(function (item, index) {
+      var color = item.color || PALETTE[index % PALETTE.length];
+      var width = Math.max(2, (item.total / maxTotal) * 100);
+      var label = TYPE_LABEL[item.type] || "";
+      var badge = label
+        ? '<span class="badge ' + (TYPE_CLASS[item.type] || "other") + '">' + label.toUpperCase() + "</span>"
+        : "";
+      var value = metric === "watch" ? fmtHours(item.total) : fmtInt(item.total);
+      return '<div class="video-item">' +
+        '<div class="video-title">' + badge + escapeHtml(item.title) + "</div>" +
+        '<div class="video-meta"><span>' + escapeHtml(item.id) + "</span><span>" + value + "</span></div>" +
+        '<div class="bar"><div style="width:' + width + "%;background:" + color + '"></div></div>' +
+      "</div>";
+    }).join("");
+  }
+
+  function render(model) {
+    if (typeof Chart === "undefined") {
+      showError("The chart library failed to load. Refresh the page to try again.");
+      return;
+    }
+    var channel = model.channel;
+    if (channel) {
+      var snippet = channel.snippet || {};
+      var thumbs = snippet.thumbnails || {};
+      var avatar = (thumbs.default && thumbs.default.url) || (thumbs.medium && thumbs.medium.url) || "";
+      $("accountName").textContent = snippet.title || "Connected channel";
+      if (avatar) {
+        $("accountAvatar").src = avatar;
+        $("accountAvatar").hidden = false;
+      } else {
+        $("accountAvatar").hidden = true;
+      }
+    } else {
+      $("accountName").textContent = "Connected account";
+      $("accountAvatar").hidden = true;
+    }
+
+    var video = model.videoChart;
+    var metric = video ? video.metric : "views";
+    var metricLabel = metric === "watch" ? "watch time" : "views";
+    var selectedTotal = video && video.total && video.total.length
+      ? video.total[video.total.length - 1]
+      : null;
+
+    $("kpiTotalLabel").textContent = "Total " + metricLabel;
+    $("kpiTotal").textContent = selectedTotal != null
+      ? (metric === "watch" ? fmtHours(selectedTotal) : fmtInt(selectedTotal))
+      : "-";
+    $("kpiVideos").textContent = video ? fmtInt(video.videoCount) : "-";
+    $("kpiDays").textContent = fmtInt(model.daily.length);
+    $("kpiEnd").textContent = model.lastDate || "-";
+    $("kpiSubs").textContent = model.currentSubs != null ? fmtInt(model.currentSubs) : "-";
+    var netEl = $("kpiSubsNet");
+    if (model.hasData) {
+      netEl.textContent = (model.netSubs >= 0 ? "+" : "") + fmtInt(model.netSubs) + " in range";
+      netEl.style.color = model.netSubs < 0 ? "#ff6b6b" : "#3bffb0";
+    } else {
+      netEl.textContent = "";
+    }
+    updateTypeOptions(video);
+    $("listTitle").textContent = "Top videos by " + metricLabel;
+
+    renderVideoChart(model);
+    renderTotalChart(model);
+    renderDailyChart(model);
+    renderSubsTotalChart(model);
+    renderSubsChart(model);
+    renderVideoList(model);
+
+    $("exportCsv").disabled = !model.hasData || !video;
+  }
+
+  function downloadChart(canvasId, name) {
+    var chart = charts[canvasId];
+    if (!chart || !currentData) return;
+    var source = chart.canvas;
+    if (!source || !source.width || !source.height) return;
+    var padding = 16;
+    var output = document.createElement("canvas");
+    output.width = source.width + padding * 2;
+    output.height = source.height + padding * 2;
+    var context = output.getContext("2d");
+    if (!context) return;
+    context.fillStyle = "#0f1115";
+    context.fillRect(0, 0, output.width, output.height);
+    context.drawImage(source, padding, padding);
+    var link = document.createElement("a");
+    link.download = "channel-growth_" + (name || canvasId) + "_" + currentData.start + "_to_" + currentData.end + ".png";
+    link.href = output.toDataURL("image/png");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function showUpdatedStatus(model) {
+    if (!model) return;
+    $("updated").textContent = "Last updated: " + new Date().toLocaleString();
+    if (model.hasData) {
+      setStatus("Updated " + new Date().toLocaleTimeString() + " \u00b7 " + model.daily.length + " days \u00b7 data through " + model.lastDate, false);
+    } else {
+      setStatus("No analytics rows returned for this range.", false);
+    }
+  }
+
+  function reloadVideoChart() {
+    if (!currentData || !currentData.hasData || !accessToken) return;
+    var opts = currentVideoOptions();
+    var start = currentData.start;
+    var end = currentData.end;
+    var seq = ++videoSeq;
+    setVideoBusy(true);
+    setStatus("Loading per-video history\u2026", false);
+
+    fetchVideoHistory(start, end, opts).then(function (history) {
+      var ids = history.rows.map(function (video) { return video.id; });
+      return fetchVideoMeta(ids).catch(function (err) {
+        if (err.code === 401) throw err;
+        return {};
+      }).then(function (meta) {
+        return attachVideoMeta(history, meta);
+      });
+    }).then(function (history) {
+      if (seq !== videoSeq || !currentData) return;
+      currentData.videoChart = buildVideoChartData(currentData, history);
+      render(currentData);
+      if (history.error) {
+        showNotice("Per-video history could not be loaded for this range.");
+      } else if (history.dailyError) {
+        showNotice("Some per-video history could not be loaded, so those lines may be incomplete.");
+      } else if (history.typeUnavailable && opts.type !== "all") {
+        showNotice(typeFilterNotice(history));
+      } else {
+        hideNotice();
+      }
+      showUpdatedStatus(currentData);
+    }).catch(function (err) {
+      if (seq !== videoSeq) return;
+      if (err.code === 401) {
+        clearSession("Your Google session expired. Connect again to continue.", true);
+        return;
+      }
+      showNotice("Per-video history could not be loaded: " + friendlyError(err));
+      if (currentData) {
+        currentData.videoChart = buildVideoChartData(currentData, {
+          rows: [],
+          allRows: [],
+          daily: [],
+          opts: opts,
+          typeUnavailable: false,
+          error: err,
+          dailyError: null
+        });
+        render(currentData);
+      }
+    }).then(function () {
+      if (seq === videoSeq) setVideoBusy(false);
+    });
+  }
+
+  function exportCsv() {
+    if (!currentData || !currentData.hasData) return;
+    var rows = [["Date", "Views", "Watch minutes", "Subscribers gained", "Subscribers lost", "Shorts views", "Videos views", "Live / other views"]];
+    currentData.daily.forEach(function (r, i) {
+      rows.push([
+        r.date,
+        r.views,
+        Math.round(r.minutes * 100) / 100,
+        r.gained,
+        r.lost,
+        currentData.shorts[i],
+        currentData.videos[i],
+        currentData.other[i]
+      ]);
+    });
+    var csv = rows.map(function (row) {
+      return row.map(csvCell).join(",");
+    }).join("\r\n");
+    var blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = "channel-growth_" + currentData.start + "_to_" + currentData.end + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function loadAll(channelOverride) {
+    var useChannelOverride = arguments.length > 0;
+    if (!accessToken) {
+      clearSession("Connect your Google account to load analytics.", false);
+      return;
+    }
+    if (tokenExpiresAt && Date.now() >= tokenExpiresAt - 30000) {
+      clearSession("Your Google session expired. Connect again.", true);
+      return;
+    }
+
+    var start = $("startDate").value;
+    var end = $("endDate").value;
+    if (!start || !end) {
+      showError("Choose a start and end date.");
+      return;
+    }
+    if (start > end) {
+      showError("The start date must be on or before the end date.");
+      return;
+    }
+
+    var seq = ++requestSeq;
+    videoSeq += 1;
+    setVideoBusy(false);
+    videoDailyCache = {};
+    var videoOpts = currentVideoOptions();
+    setBusy(true);
+    hideError();
+    hideNotice();
+    setStatus("Loading analytics from Google\u2026", false);
+
+    Promise.all([
+      analytics({
+        startDate: start,
+        endDate: end,
+        metrics: "views,estimatedMinutesWatched,subscribersGained,subscribersLost",
+        dimensions: "day",
+        sort: "day",
+        maxResults: 5000
+      }),
+      fetchSplit(start, end),
+      useChannelOverride ? Promise.resolve(channelOverride) : fetchChannel().catch(function (err) {
+        if (err.code === 401) throw err;
+        return null;
+      }),
+      fetchVideoHistory(start, end, videoOpts)
+    ]).then(function (results) {
+      var totals = results[0];
+      var split = results[1];
+      var channel = results[2];
+      var videoHistory = results[3];
+      var ids = videoHistory.rows.map(function (row) { return row.id; });
+      return fetchVideoMeta(ids).catch(function (err) {
+        if (err.code === 401) throw err;
+        return {};
+      }).then(function (meta) {
+        return {
+          totals: totals,
+          split: split,
+          channel: channel,
+          videoHistory: attachVideoMeta(videoHistory, meta)
+        };
+      });
+    }).then(function (result) {
+      if (seq !== requestSeq) return;
+      var model = buildModel({
+        start: start,
+        end: end,
+        totals: result.totals,
+        split: result.split.rows,
+        splitError: result.split.error,
+        channel: result.channel,
+        videoHistory: result.videoHistory
+      });
+      currentData = model;
+      render(model);
+
+      var notices = [];
+      if (result.split.error) {
+        notices.push("The Shorts/video split is unavailable for this channel, so content-filter totals may be incomplete.");
+      }
+      if (result.videoHistory.rows.length && (!result.videoHistory.meta || !Object.keys(result.videoHistory.meta).length)) {
+        notices.push("Video titles could not be loaded; video IDs are shown instead.");
+      }
+      if (!result.channel) {
+        notices.push("Channel profile details (avatar and current subscriber total) could not be loaded.");
+      }
+      if (result.videoHistory.error) {
+        notices.push("Per-video history is unavailable for this range; channel charts are still shown.");
+      } else if (result.videoHistory.dailyError) {
+        notices.push("Some per-video history could not be loaded, so those lines may be incomplete.");
+      } else if (result.videoHistory.typeUnavailable && videoOpts.type !== "all") {
+        notices.push(typeFilterNotice(result.videoHistory));
+      }
+      showNotice(notices.join(" "));
+      showUpdatedStatus(model);
+    }).catch(function (err) {
+      if (seq !== requestSeq) return;
+      if (err.code === 401) {
+        clearSession("Your Google session expired. Connect again to continue.", true);
+        return;
+      }
+      showError(friendlyError(err));
+      setStatus("Could not load analytics", true);
+    }).then(function () {
+      if (seq === requestSeq) setBusy(false);
+    });
+  }
+
+  function setActivePreset(value) {
+    document.querySelectorAll(".chip[data-days]").forEach(function (button) {
+      button.classList.toggle("active", button.dataset.days === value);
+    });
+  }
+  function applyPreset(days, shouldLoad) {
+    var end = pacificToday();
+    var start = addDays(end, -(Number(days) - 1));
+    $("startDate").value = start;
+    $("endDate").value = end;
+    setActivePreset(String(days));
+    if (shouldLoad && !$("app").hidden) loadAll();
+  }
+  function onDateChange() {
+    setActivePreset("");
+    if ($("app").hidden) return;
+    clearTimeout(loadTimer);
+    loadTimer = setTimeout(function () { loadAll(); }, 350);
+  }
+
+  function init() {
+    var today = pacificToday();
+    $("startDate").max = today;
+    $("endDate").max = today;
+    applyPreset(90, false);
+
+    if (PLACEHOLDER) {
+      $("configNotice").hidden = false;
+      $("configNotice").textContent = "Setup required: add a Web application OAuth client ID to web/config.js (see README). Sign-in is disabled until then.";
+      $("connect").disabled = true;
+      setGateStatus("This deployment is not configured yet.", true);
+    } else {
+      $("configNotice").hidden = true;
+      setGateStatus(defaultGateMessage(), false);
+    }
+
+    $("brandRefresh").addEventListener("click", function (event) {
+      event.preventDefault();
+      location.reload();
+    });
+    $("connect").addEventListener("click", connect);
+    $("signOut").addEventListener("click", signOut);
+    $("refresh").addEventListener("click", function () { loadAll(); });
+    $("exportCsv").addEventListener("click", exportCsv);
+    document.querySelectorAll(".chip[data-days]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyPreset(Number(button.dataset.days), true);
+      });
+    });
+    $("startDate").addEventListener("change", onDateChange);
+    $("endDate").addEventListener("change", onDateChange);
+    ["videoMetric", "videoType", "videoTop"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.addEventListener("change", reloadVideoChart);
+    });
+    document.querySelectorAll("button[data-chart]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        downloadChart(button.dataset.chart, button.dataset.name);
+      });
+    });
+
+    if (!PLACEHOLDER && readStoredToken()) {
+      armTokenTimer();
+      enterApp();
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
 </script>
 </body>
 </html>

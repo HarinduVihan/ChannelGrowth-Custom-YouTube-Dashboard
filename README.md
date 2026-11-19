@@ -1,6 +1,16 @@
-# Custom YouTube Dashboard
+# Channel Growth
 
 A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
+
+A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, subscriber changes, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
+
+Live site: <https://channelgrowth.me/>
+
+<img width="1586" height="1296" alt="image" src="https://github.com/user-attachments/assets/6afaacb9-aff7-461e-bbe3-d499f37d47a9" />
+
+<img width="1124" height="1126" alt="image" src="https://github.com/user-attachments/assets/2470fc02-2bff-45b2-9438-8e73561cedb8" />
+
+<img width="1104" height="677" alt="image" src="https://github.com/user-attachments/assets/bf00709c-388a-4e27-be6c-1dfc3860d4a4" />
 
 ## Problem Statement
 
@@ -11,205 +21,204 @@ YouTube Studio shows aggregate channel numbers, but it does not clearly answer *
 - How is the channel's subscriber count growing, and when do spikes happen?
 - Can all of this be explored locally, with filters and live data?
 
-### The obstacle faced
+## How it works
 
-- The Analytics API rejects `dimensions=day,video`, and `dimensions=video` alone. Per-video data only works by querying **one video at a time** with `filters=video==<id>` and `dimensions=day,creatorContentType`.
-- `creatorContentType` is what makes it possible to classify each video as `shorts` or `videoOnDemand`.
-- Enumerating uploads **including Shorts** requires the **YouTube Data API v3**. Without it, the fallback is the Studio `Table data.csv`, which only contains long-form videos.
-- The Analytics API lags about **2 days**, so recent data is always slightly behind.
-- "Watch time" is Google's `estimatedMinutesWatched` (the same value as Studio's *Watch time hours*); it is converted to hours for display.
-- The API has **no historical subscriber total** — only `subscribersGained` and `subscribersLost` per day. The subscriber curve must therefore be reconstructed backwards and anchored to the current `subscriberCount` from the Data API.
-
-## How We Solved It
-
-1. **Fetch layer** (`scripts/per_video_growth.py`) — walks every upload, fetches daily views, watch minutes, and content type in a single call per video, and fetches subscriber gains/losses in date chunks (avoiding the API's broken `startIndex` pagination). Results are cached locally.
-2. **Server layer** (`scripts/dashboard_server.py`) — seeds from the cache, serves JSON, and can refresh live. Handles date range, content type, metric, and Top-N filters, plus subscriber aggregation.
-3. **UI layer** (`web/dashboard.html`) — a local web dashboard with a Views/Watch time toggle, All/Videos/Shorts filter, Top-N ranking, and a dedicated subscriber section (current KPI, reconstructed total line, daily gained/lost bars).
-4. **Reliability** — cache-based startup keeps the dashboard instant, refresh is optional, long-form fallback works without the Data API, and credentials/personal data stay out of Git.
-
-In short: the project turns a fragmented and restrictive API surface into a cached, queryable dataset and a dashboard that explains **which videos and content types actually drive views, watch time, and subscriber growth over time** — not just a single total number.
+1. The site is a static app hosted on GitHub Pages.
+2. The user clicks **Continue with Google**. Google Identity Services returns a short-lived OAuth access token (about one hour, no refresh token) using read-only scopes.
+3. The browser calls the YouTube Analytics API and YouTube Data API v3 directly with that token and renders the results with Chart.js.
+4. The token is kept in the tab's `sessionStorage`. It is cleared on sign-out, expiry, or tab close. The site operator never sees or stores it.
+5. No analytics data is written to disk or sent to the site operator. CSV and PNG exports happen locally in the browser.
 
 ## Features
 
-- Cumulative line chart for each video (no fills)
-- Channel-total cumulative chart
-- Daily activity bar chart
-- Switch the metric between **Views** and **Watch time (hours)**
-- Filter by content type: All, Videos, Shorts
-- **Subscribers** KPI with current total and net change in the selected range
-- **Subscriber total** line chart (reconstructed from daily gains/losses)
-- **Subscribers gained / lost per day** bar chart
-- Date-range and Top-N controls
-- Live refresh from the YouTube Analytics API (cached locally)
-- **Download CSV** of the current filtered dataset from the dashboard
-- **Download PNG** of any chart from the dashboard
-- Exports PNG charts and CSV data from the CLI
-- Optional Matplotlib charts for offline use
-- Static GitHub Pages build with daily scheduled data updates
-
-<img width="1485" height="1238" alt="image" src="https://github.com/user-attachments/assets/3c794cf6-3a58-4906-b2ba-c920fcefd793" />
-
-<img width="1472" height="1228" alt="image" src="https://github.com/user-attachments/assets/423d1b1f-e437-4710-80d6-675d96e13e6e" />
-
-<img width="1155" height="1118" alt="image" src="https://github.com/user-attachments/assets/0635ca58-92bd-497a-9305-6df2c9e2fc5a" />
-
-
-## Requirements
-
-- Python 3.9+
-- A Google account with access to the channel
-- A Google Cloud project with these APIs enabled:
-  - **YouTube Analytics API** (required)
-  - **YouTube Data API v3** (required to list Shorts; without it only long-form videos are found)
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
+- Google sign-in with read-only access to the user's own channel (`channel==MINE`)
+- Branch 2 dashboard layout with KPI cards for total views/watch time, videos tracked, days, data through, and subscribers
+- Global Views/Watch time metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
+- Regular videos reported as `UNSPECIFIED` by Google are included in the Videos filter
+- Per-video cumulative views or watch time with an "Other videos" residual line
+- Channel total cumulative views or watch time
+- Daily views or watch time
+- Subscriber total over time, estimated from daily gains/losses, anchored to the current count, and clamped at zero
+- Daily subscribers gained/lost chart
+- Top-videos sidebar with type badges, IDs, totals, and progress bars
+- PNG download for every chart
+- Start/end date controls; the initial range starts at the channel creation date
+- CSV export of the current range
+- Channel avatar and name in the header, with sign-out; logo/title refreshes the dashboard
+- Clear loading, empty, quota, permission, and expired-session states
 
 ## Google Cloud setup (one time)
 
-1. Create or select a project in the [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable **YouTube Analytics API** and **YouTube Data API v3** under **APIs & Services → Library**.
-3. Configure **Google Auth Platform / OAuth consent screen** (External) and add your Google account as a **Test user**.
-4. Create an OAuth client ID of type **Desktop app**.
-5. Download the JSON and save it as:
+Use the same Cloud project for the site and the optional local scripts.
 
-```text
-secrets/client_secret.json
+1. Enable **YouTube Analytics API** and **YouTube Data API v3** in [Google Cloud Console](https://console.cloud.google.com/) under **APIs & Services > Library**.
+2. Configure the **Google Auth Platform / OAuth consent screen** as **External**.
+3. Add the two read-only scopes under **Data access**:
+   - `https://www.googleapis.com/auth/yt-analytics.readonly`
+   - `https://www.googleapis.com/auth/youtube.readonly`
+4. Create an OAuth client ID of type **Web application**:
+   - Authorized JavaScript origin: `https://channelgrowth.me`
+   - Authorized JavaScript origin for the `www` host: `https://www.channelgrowth.me`
+   - Authorized JavaScript origin for local testing: `http://localhost:8080`
+5. Copy the client ID (it ends in `.apps.googleusercontent.com`) into `web/config.js`:
+
+```js
+window.CHANNEL_GROWTH_CONFIG = {
+  clientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+  scopes: [
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+    "https://www.googleapis.com/auth/youtube.readonly"
+  ],
+  siteUrl: "https://channelgrowth.me/"
+};
 ```
 
-On the first run, a browser window opens for sign-in. The resulting token is stored at `secrets/token.json` and reused afterward.
+The client ID is public and is expected to be visible in the page. Do not put a client secret in this file or anywhere in the repository.
 
-## Usage
+6. Under **Branding**, set:
+   - App name: `Channel Growth`
+   - Authorized domain: `channelgrowth.me`
+   - Homepage: `https://channelgrowth.me/`
+   - Privacy policy: `https://channelgrowth.me/privacy.html`
+   - Terms of service: `https://channelgrowth.me/terms.html`
+7. After the site is live and the branding URLs return `200`, publish the app under **Audience > Publish app**.
 
-### Web dashboard
+While the app is in **Testing**, only listed test users can connect, and Google shows an unverified-app warning for sensitive scopes. Publishing removes that warning for approved use. Verification is required for broader public use.
 
-```bash
-python scripts/dashboard_server.py
-```
-
-This opens <http://127.0.0.1:8000>. Pass a port to change it:
-
-```bash
-python scripts/dashboard_server.py 8080
-```
-
-On first load it uses cached data from `data/generated/`. Click **Refresh from YouTube** to fetch the latest data (may take about a minute). Use **Download CSV** to export the currently filtered data, and the **PNG** button on any chart to save it as an image.
-
-### Per-video charts (Matplotlib)
-
-```bash
-python scripts/per_video_growth.py
-```
-
-Useful flags:
-
-```bash
-python scripts/per_video_growth.py --top 15
-python scripts/per_video_growth.py --start 2024-01-01 --end 2026-11-06
-python scripts/per_video_growth.py --reuse   # redraw from cached CSV, no API calls
-```
-
-### Channel-total cumulative chart
-
-```bash
-python scripts/plot_growth.py
-python scripts/plot_growth.py "path/to/Totals.csv" --show
-```
+The original Desktop OAuth client and `secrets/` credentials are only for the optional local Python scripts. They are not used by the deployed site.
 
 ## Hosting on GitHub Pages
 
-The dashboard can be published as a static site. A GitHub Actions workflow (`.github/workflows/pages.yml`) runs daily, fetches the latest data, builds `dist/`, and deploys it to GitHub Pages.
+The workflow at `.github/workflows/pages.yml` builds the app shell and deploys `dist/` on every push to `main`, or when run manually from **Actions > Build and deploy dashboard > Run workflow**. There is no scheduled data job because data is fetched live in each visitor's browser.
 
-### One-time setup
+### Custom domain
 
-1. **Use a custom domain.** Publishing an External OAuth app now requires a homepage URL, a privacy policy URL, and a domain verified as a Search Console **Domain** property (DNS TXT). The default `*.github.io` URL cannot be verified this way. This project uses **channelgrowth.me** (a free `.me` domain is included with the GitHub Student Pack via Namecheap):
-   - Namecheap → Domain List → Manage → Advanced DNS:
-     - `A` records for `@`: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
-     - `CNAME` for `www`: `harinduvihan.github.io.`
-   - GitHub → Settings → Pages → **Custom domain** → `channelgrowth.me`, then enable **Enforce HTTPS** once the certificate is ready.
-   - Search Console → **Add property → Domain** → `channelgrowth.me` → verify with the TXT record in Namecheap. Use a Google account that is an Owner or Editor on the Cloud project.
-2. **Set the custom domain for the build.** GitHub → Settings → Secrets and variables → Actions → **Variables → New repository variable**: `CUSTOM_DOMAIN` = `channelgrowth.me`. The build writes `dist/CNAME`. Alternatively commit `web/CNAME`.
-3. **Publish the OAuth app.** Google Auth Platform → **Branding**: add the authorized domain `channelgrowth.me`, homepage `https://channelgrowth.me/`, privacy policy `https://channelgrowth.me/privacy.html`, and terms `https://channelgrowth.me/terms.html`; save. Then **Audience → Publish app**. Refresh tokens issued while the app is in *Testing* expire after about 7 days. If the console says *Domain not found*, confirm the Search Console property is a **Domain** property (not URL-prefix) and is owned by the same Google account.
-4. **Add repository secrets.** In GitHub → Settings → Secrets and variables → Actions, add:
-   - `GOOGLE_CLIENT_SECRET` — contents of `secrets/client_secret.json`
-   - `GOOGLE_TOKEN` — contents of `secrets/token.json` after the first local sign-in (re-run the sign-in after publishing so the new token does not expire)
-5. **Enable Pages.** Settings → Pages → Build and deployment → Source: **GitHub Actions**.
-6. **Run the workflow.** Actions → *Update and deploy dashboard* → *Run workflow*. When it finishes, the site is available at your custom domain.
+1. In Namecheap (or your DNS provider), set:
+   - `A` records for `@`: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
+   - `CNAME` for `www`: `harinduvihan.github.io.`
+2. In GitHub, open **Settings > Pages**, set the custom domain to `channelgrowth.me`, and enable **Enforce HTTPS** once the certificate is ready.
+3. Verify the domain in [Google Search Console](https://search.google.com/search-console) as a **Domain** property using the DNS TXT record. Google OAuth branding requires a verified domain property.
 
-The workflow also runs daily at 03:00 UTC and on pushes to `main`. Scheduled workflows are disabled after 60 days of repository inactivity.
+`web/CNAME` contains `channelgrowth.me` and is copied into the build. The build also honors a `CUSTOM_DOMAIN` environment variable if you need to override it.
 
-### Privacy note
+## Local development
 
-GitHub Pages sites are public on free and Pro plans; private Pages requires GitHub Enterprise. If you need access control, deploy the generated `dist/` folder to Cloudflare Pages and put **Cloudflare Access** in front of it.
+Serve the site over HTTP rather than opening the HTML file directly; OAuth authorized origins do not work with `file://`.
 
-### Build the static site locally
+The built site has the correct `index.html` entry point, so building first is the simplest option:
 
 ```bash
-python scripts/per_video_growth.py
+python scripts/build_static.py
+python -m http.server 8080 --directory dist
+```
+
+Open <http://localhost:8080>. Add `http://localhost:8080` as an authorized JavaScript origin on the Web OAuth client. `http://127.0.0.1:8080` may be treated as a different origin, so use the same host you added.
+
+To preview unbuilt source from `web/`, open <http://localhost:8080/dashboard.html> instead of the directory root.
+
+## Build the static site
+
+```bash
 python scripts/build_static.py
 ```
 
-Then open `dist/index.html`, or serve the folder:
+The build cleans `dist/` and copies:
+
+- `dashboard.html` -> `index.html` and `dashboard.html`
+- `privacy.html`, `terms.html`, `config.js`
+- `vendor/chart.umd.min.js` and its license
+- `.nojekyll`
+- `CNAME` when a domain is configured
+
+It does **not** write `data.json` or include cached analytics. If `web/config.js` still contains the placeholder client ID, the build stops with an error; set `ALLOW_PLACEHOLDER=1` to build a preview anyway:
+
+```powershell
+$env:ALLOW_PLACEHOLDER = "1"
+python scripts/build_static.py
+```
+
+Then preview the build:
 
 ```bash
 python -m http.server 8080 --directory dist
 ```
 
-The static build writes `dist/data.json`, copies the dashboard plus `privacy.html` and `terms.html`, and applies the date, content, metric, and Top-N filters in the browser. To include the GitHub Pages CNAME file locally:
+## API usage
 
-```powershell
-$env:CUSTOM_DOMAIN = "channelgrowth.me"
-python scripts/build_static.py
+Each dashboard load makes a mix of channel-level and bounded per-video requests:
+
+- `reports.query` with `dimensions=day` for daily views, watch minutes, subscribers gained, and subscribers lost
+- `reports.query` with `dimensions=day,creatorContentType` for content-filter totals
+- `reports.query` for top videos: first tries `dimensions=video,creatorContentType`; if unsupported, it tries a `creatorContentType==SHORTS|VIDEO_ON_DEMAND` filter, then falls back to an unfiltered top 2,000 ranking classified by a playback-details query (`dimensions=video,creatorContentType` plus `filters=video==ID,...`)
+- One paginated `reports.query` per selected top video with `dimensions=day` and `filters=video==VIDEO_ID` for cumulative history
+- `videos.list` for titles of the selected top videos
+- `channels.list?mine=true` for the channel name, avatar, and current subscriber count
+
+Per-video history is deliberately bounded to the selected top 5/10/15/20 videos rather than fanning out over every upload. Larger Top-N values, long date ranges, and changing the metric/type controls use additional API quota. Successful per-video daily responses are cached for the current date range while the tab is open. If the top-videos content-type report is unsupported, the app first tries a per-type top-videos filter, then classifies up to 2,000 ranked videos via a playback-details query (or per-video fallback) before showing a notice. Google may report regular videos as `UNSPECIFIED`; those are treated as `VIDEO_ON_DEMAND` for the Videos filter.
+
+YouTube Analytics data typically lags one to two days. All visitors share the Cloud project's API quota; there is no server-side rate limiting because there is no server. If the project runs out of quota, the app shows a quota message and users can retry later.
+
+## Legacy local tooling
+
+The original per-video Python pipeline is still in the repository for local exploration and is not part of the deployed site:
+
+- `scripts/per_video_growth.py` fetches per-video daily data and builds Matplotlib charts.
+- `scripts/dashboard_server.py` serves a local dashboard from cached data with `/api/data` and `/api/export.csv`.
+- `scripts/plot_growth.py` draws a channel-total cumulative chart from a Studio CSV export.
+- `secrets/client_secret.json` and `secrets/token.json` are Desktop OAuth credentials for those local scripts and are git-ignored.
+
+Install Python dependencies only if you use these scripts:
+
+```bash
+pip install -r requirements.txt
 ```
+
+The GitHub Actions workflow no longer uses `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN`, or `CUSTOM_DOMAIN` repository secrets/variables. They can be removed from repository settings.
 
 ## Project structure
 
 ```text
 .
 ├── .github/
-│   └── workflows/pages.yml    # scheduled fetch + GitHub Pages deploy
+│   └── workflows/pages.yml    # builds the app shell and deploys to Pages
 ├── scripts/
-│   ├── dashboard_server.py    # local web server + API endpoint
-│   ├── per_video_growth.py    # API fetching + per-video charts
-│   ├── build_static.py        # builds dist/ for GitHub Pages
-│   └── plot_growth.py         # channel-total cumulative chart
+│   ├── build_static.py        # copies web/ to dist/ (no data)
+│   ├── dashboard_server.py    # legacy local server
+│   ├── per_video_growth.py    # legacy local per-video fetcher/charts
+│   └── plot_growth.py         # legacy channel-total chart
 ├── web/
-│   ├── dashboard.html         # dashboard UI (Chart.js, local + static)
-│   ├── privacy.html           # privacy policy for OAuth publishing
-│   └── terms.html             # terms of service for OAuth publishing
-├── data/
-│   ├── raw/                   # YouTube Studio CSV export (local only)
-│   └── generated/             # derived CSVs + subscribers.json (local only)
-├── output/                    # generated PNG charts (local only)
-├── dist/                      # generated static site (local only)
-├── secrets/                   # OAuth credentials (local only)
+│   ├── dashboard.html         # sign-in, live API fetches, charts, top videos
+│   ├── config.js              # public Web OAuth client ID + scopes
+│   ├── privacy.html           # privacy policy
+│   ├── terms.html             # terms of service
+│   ├── CNAME                  # channelgrowth.me
+│   └── vendor/
+│       ├── chart.umd.min.js   # Chart.js 4.4.1 (MIT)
+│       └── CHARTJS-LICENSE.md
+├── data/                      # legacy local caches (git-ignored)
+├── output/                    # legacy chart output (git-ignored)
+├── dist/                      # generated static site (git-ignored)
+├── secrets/                   # local OAuth credentials (git-ignored)
 ├── requirements.txt
 └── .gitignore
 ```
 
-`secrets/`, `data/`, `output/`, and `dist/` are git-ignored because they contain credentials, personal channel data, or generated output.
-
-## Data notes
-
-- The YouTube Analytics API typically lags about **2 days**, so the most recent days may be missing.
-- Views and watch time are fetched in a single call using `metrics=views,estimatedMinutesWatched`.
-- Watch time is displayed in **hours** (`estimatedMinutesWatched / 60`), which matches YouTube Studio's **Watch time (hours)**.
-- Daily activity is attributed per video using `creatorContentType` (`shorts` or `videoOnDemand`).
-- Subscribers come from `subscribersGained` / `subscribersLost` per day. The absolute total is anchored to the current `subscriberCount` from the YouTube Data API, so history is reconstructed backwards.
-- Subscriber data is channel-level only; the API cannot attribute subscribers to individual videos.
-- Video titles and the offline fallback list come from the Studio export (`Table data.csv`) in `data/raw/`.
-- If the YouTube Data API is not enabled, the dashboard falls back to long-form videos only and shows a notice.
-
 ## Troubleshooting
 
-- **`The query is not supported`** — the Analytics API does not support all dimension combinations. This project queries each video separately with a `video==ID` filter, which is supported.
-- **No Shorts appear** — enable **YouTube Data API v3**, then click **Refresh from YouTube**.
-- **`Missing OAuth client file`** — make sure `secrets/client_secret.json` exists.
-- **Auth expired** — delete `secrets/token.json` and run a script again to re-authorize.
+- **"This deployment is not configured yet"** — `web/config.js` still has the placeholder client ID. Create the Web OAuth client and paste its ID.
+- **`redirect_uri_mismatch` or `origin_mismatch`** — add the exact origin (`https://channelgrowth.me`, `https://www.channelgrowth.me`, or `http://localhost:8080`) to the Web OAuth client's authorized JavaScript origins.
+- **"Access blocked" / unverified app** — add your Google account as a test user while the app is in Testing, or publish the app after branding and domain verification.
+- **No channel analytics** — use an account that owns or manages the channel, and confirm the YouTube Analytics API is enabled for the project.
+- **Videos filter looks empty but Shorts works** — Google may label regular videos as `UNSPECIFIED`; the app treats those as Videos. If the notice still appears, check `window.__lastTypeError` in DevTools.
+- **Top videos show IDs only** — the YouTube Data API v3 may be disabled or the quota may be exhausted; titles and thumbnails fall back to IDs and static thumbnail URLs.
+- **No recent days** — normal. YouTube Analytics usually reports with a one- to two-day delay.
+- **Session expired** — sign in again. Browser token-client sessions last about an hour and do not use refresh tokens.
+- **Charts do not render** — confirm `web/vendor/chart.umd.min.js` was copied into `dist/vendor/` and that JavaScript is enabled.
+
+## Privacy and terms
+
+The deployed policy pages are `web/privacy.html` and `web/terms.html`. They describe browser-only processing, the two read-only scopes, `sessionStorage` token handling, local CSV export, and Google API Limited Use.
 
 ## License
 
-No license has been specified for this project.
+No license has been specified for this project. Chart.js is distributed under the MIT License; see `web/vendor/CHARTJS-LICENSE.md`.
