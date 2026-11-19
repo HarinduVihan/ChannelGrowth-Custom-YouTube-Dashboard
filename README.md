@@ -1,8 +1,25 @@
 # Channel Growth
 
+A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
+
 A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, subscriber changes, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
 
 Live site: <https://channelgrowth.me/>
+
+<img width="1586" height="1296" alt="image" src="https://github.com/user-attachments/assets/6afaacb9-aff7-461e-bbe3-d499f37d47a9" />
+
+<img width="1124" height="1126" alt="image" src="https://github.com/user-attachments/assets/2470fc02-2bff-45b2-9438-8e73561cedb8" />
+
+<img width="1104" height="677" alt="image" src="https://github.com/user-attachments/assets/bf00709c-388a-4e27-be6c-1dfc3860d4a4" />
+
+## Problem Statement
+
+YouTube Studio shows aggregate channel numbers, but it does not clearly answer **what is driving growth over time**. This project was built to answer questions like:
+
+- Which individual videos contribute most to cumulative views and watch time?
+- Are **Shorts** or **long-form videos** driving growth?
+- How is the channel's subscriber count growing, and when do spikes happen?
+- Can all of this be explored locally, with filters and live data?
 
 ## How it works
 
