@@ -34,7 +34,7 @@ YouTube Studio shows aggregate channel numbers, but it does not clearly answer *
 - Google sign-in with read-only access to the user's own channel (`channel==MINE`)
 - Branch 2 dashboard layout with KPI cards for total views/watch time, videos tracked, days, data through, and subscribers
 - Global Views/Watch time metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
-- Regular videos reported as `UNSPECIFIED` by Google are included in the Videos filter
+- Regular videos reported as `UNSPECIFIED` by Google are included in the Videos filter and totals
 - Per-video cumulative views or watch time with an "Other videos" residual line
 - Channel total cumulative views or watch time
 - Daily views or watch time
@@ -154,7 +154,7 @@ Each dashboard load makes a mix of channel-level and bounded per-video requests:
 - `videos.list` for titles of the selected top videos
 - `channels.list?mine=true` for the channel name, avatar, and current subscriber count
 
-Per-video history is deliberately bounded to the selected top 5/10/15/20 videos rather than fanning out over every upload. Larger Top-N values, long date ranges, and changing the metric/type controls use additional API quota. Successful per-video daily responses are cached for the current date range while the tab is open. If the top-videos content-type report is unsupported, the app first tries a per-type top-videos filter, then classifies up to 2,000 ranked videos via a playback-details query (or per-video fallback) before showing a notice. Google may report regular videos as `UNSPECIFIED`; those are treated as `VIDEO_ON_DEMAND` for the Videos filter.
+Per-video history is deliberately bounded to the selected top 5/10/15/20 videos rather than fanning out over every upload. Larger Top-N values, long date ranges, and changing the metric/type controls use additional API quota. Successful per-video daily responses are cached for the current date range while the tab is open. If the top-videos content-type report is unsupported, the app first tries a per-type top-videos filter, then classifies up to 2,000 ranked videos via a playback-details query (or per-video fallback) before showing a notice. Google may report regular videos as `UNSPECIFIED`; those are treated as `VIDEO_ON_DEMAND` for the Videos filter and its totals.
 
 YouTube Analytics data typically lags one to two days. All visitors share the Cloud project's API quota; there is no server-side rate limiting because there is no server. If the project runs out of quota, the app shows a quota message and users can retry later.
 

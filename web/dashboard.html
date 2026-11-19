@@ -787,8 +787,8 @@
   }
   function splitBucket(type) {
     if (type === "SHORTS") return "SHORTS";
-    if (type === "VIDEO_ON_DEMAND") return "VIDEO_ON_DEMAND";
-    return "OTHER";
+    if (type === "LIVE_STREAM" || type === "STORY") return "OTHER";
+    return "VIDEO_ON_DEMAND";
   }
   function shortTitle(value, max) {
     var text = String(value == null ? "" : value);
