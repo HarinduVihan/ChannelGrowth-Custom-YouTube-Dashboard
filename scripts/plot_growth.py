@@ -7,9 +7,17 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 BASE = Path(__file__).resolve().parent.parent
-CSV_PATH = BASE / "data" / "raw" / "Content 2023-08-07_2026-11-07 HVenom" / "Totals.csv"
 if len(sys.argv) > 1:
     CSV_PATH = Path(sys.argv[1])
+else:
+    candidates = sorted(
+        (BASE / "data" / "raw").glob("*/Totals.csv"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        raise SystemExit("No Totals.csv found under data/raw; pass a CSV path as an argument.")
+    CSV_PATH = candidates[0]
 
 dates, views = [], []
 with CSV_PATH.open(newline="", encoding="utf-8-sig") as f:
