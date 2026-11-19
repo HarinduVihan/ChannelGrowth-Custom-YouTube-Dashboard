@@ -567,7 +567,7 @@
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="./" aria-label="Channel Growth home">
+  <a class="brand" href="" id="brandRefresh" aria-label="Refresh dashboard">
     <span class="brand-mark" aria-hidden="true">&#9654;</span>
     <span class="brand-text">
       <strong>Channel Growth</strong>
@@ -1572,7 +1572,7 @@
     if (currentSubs != null) {
       var startTotal = currentSubs - netSubs;
       subscriberTotal = subscriberNetCumulative.map(function (value) {
-        return Math.round(startTotal + value);
+        return Math.max(0, Math.round(startTotal + value));
       });
     }
 
@@ -1788,6 +1788,7 @@
         y: {
           stacked: !!opts.stacked,
           beginAtZero: opts.beginAtZero !== false,
+          min: opts.min == null ? undefined : opts.min,
           ticks: {
             color: "#8b93a1",
             callback: function (value) { return compactFmt.format(value); }
@@ -1949,6 +1950,7 @@
       },
       options: baseOptions(model, {
         beginAtZero: anchored,
+        min: anchored ? 0 : undefined,
         tooltipLabel: function (item) {
           return (anchored ? "Total: " : "Net: ") +
             (anchored ? fmtInt(item.parsed.y) : fmtSigned(item.parsed.y)) + " subscribers";
@@ -2353,6 +2355,10 @@
       setGateStatus(defaultGateMessage(), false);
     }
 
+    $("brandRefresh").addEventListener("click", function (event) {
+      event.preventDefault();
+      location.reload();
+    });
     $("connect").addEventListener("click", connect);
     $("signOut").addEventListener("click", signOut);
     $("refresh").addEventListener("click", function () { loadAll(); });
