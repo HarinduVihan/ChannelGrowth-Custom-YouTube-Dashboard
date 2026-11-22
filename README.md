@@ -1,16 +1,8 @@
 # Channel Growth
 
-A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
-
 A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, subscriber changes, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
 
 Live site: <https://channelgrowth.me/>
-
-<img width="1586" height="1296" alt="image" src="https://github.com/user-attachments/assets/6afaacb9-aff7-461e-bbe3-d499f37d47a9" />
-
-<img width="1124" height="1126" alt="image" src="https://github.com/user-attachments/assets/2470fc02-2bff-45b2-9438-8e73561cedb8" />
-
-<img width="1104" height="677" alt="image" src="https://github.com/user-attachments/assets/bf00709c-388a-4e27-be6c-1dfc3860d4a4" />
 
 ## Problem Statement
 
@@ -20,6 +12,16 @@ YouTube Studio shows aggregate channel numbers, but it does not clearly answer *
 - Are **Shorts** or **long-form videos** driving growth?
 - How is the channel's subscriber count growing, and when do spikes happen?
 - Can all of this be explored locally, with filters and live data?
+
+## Solution
+
+A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
+
+<img width="1586" height="1296" alt="image" src="https://github.com/user-attachments/assets/6afaacb9-aff7-461e-bbe3-d499f37d47a9" />
+
+<img width="1124" height="1126" alt="image" src="https://github.com/user-attachments/assets/2470fc02-2bff-45b2-9438-8e73561cedb8" />
+
+<img width="1104" height="677" alt="image" src="https://github.com/user-attachments/assets/bf00709c-388a-4e27-be6c-1dfc3860d4a4" />
 
 ## How it works
 
@@ -32,7 +34,7 @@ YouTube Studio shows aggregate channel numbers, but it does not clearly answer *
 ## Features
 
 - Google sign-in with read-only access to the user's own channel (`channel==MINE`)
-- Branch 2 dashboard layout with KPI cards for total views/watch time, videos tracked, days, data through, and subscribers
+- Dashboard layout with KPI cards for total views/watch time, videos tracked, days, data through, and subscribers
 - Global Views/Watch time metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
 - Regular videos reported as `UNSPECIFIED` by Google are included in the Videos filter and totals
 - Per-video cumulative views or watch time with an "Other videos" residual line
