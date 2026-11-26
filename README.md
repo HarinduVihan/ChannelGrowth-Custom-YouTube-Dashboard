@@ -1,6 +1,6 @@
 # Channel Growth
 
-A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, subscriber changes, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
+A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, net subscriber contribution, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
 
 Live site: <https://channelgrowth.me/>
 
@@ -8,14 +8,14 @@ Live site: <https://channelgrowth.me/>
 
 YouTube Studio shows aggregate channel numbers, but it does not clearly answer **what is driving growth over time**. This project was built to answer questions like:
 
-- Which individual videos contribute most to cumulative views and watch time?
+- Which individual videos contribute most to cumulative views, watch time, and net subscribers?
 - Are **Shorts** or **long-form videos** driving growth?
 - How is the channel's subscriber count growing, and when do spikes happen?
 - Can all of this be explored locally, with filters and live data?
 
 ## Solution
 
-A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
+A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video for views, watch time, or net subscribers, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
 
 <img width="1586" height="1296" alt="image" src="https://github.com/user-attachments/assets/6afaacb9-aff7-461e-bbe3-d499f37d47a9" />
 
@@ -34,15 +34,16 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 ## Features
 
 - Google sign-in with read-only access to the user's own channel (`channel==MINE`)
-- Dashboard layout with KPI cards for total views/watch time, videos tracked, days, data through, and subscribers
-- Global Views/Watch time metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
+- Dashboard layout with KPI cards for the selected metric, videos tracked, days, data through, and subscribers
+- Global Views/Watch time/Subscribers metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
+- Subscribers metric is net subscribers (`subscribersGained - subscribersLost`) and can go negative
 - Regular videos reported as `UNSPECIFIED` by Google are included in the Videos filter and totals
-- Per-video cumulative views or watch time with an "Other videos" residual line
-- Channel total cumulative views or watch time
-- Daily views or watch time
+- Per-video cumulative views, watch time, or net subscribers with an "Other videos" residual line
+- Channel total cumulative views, watch time, or net subscribers
+- Daily views, watch time, or net subscribers
 - Subscriber total over time, estimated from daily gains/losses, anchored to the current count, and clamped at zero
 - Daily subscribers gained/lost chart
-- Top-videos sidebar with type badges, IDs, totals, and progress bars
+- Top-videos sidebar with type badges, IDs, signed totals, and progress bars
 - PNG download for every chart
 - Start/end date controls; the initial range starts at the channel creation date
 - CSV export of the current range
@@ -96,9 +97,9 @@ python -m http.server 8080 --directory dist
 Each dashboard load makes a mix of channel-level and bounded per-video requests:
 
 - `reports.query` with `dimensions=day` for daily views, watch minutes, subscribers gained, and subscribers lost
-- `reports.query` with `dimensions=day,creatorContentType` for content-filter totals
-- `reports.query` for top videos: first tries `dimensions=video,creatorContentType`; if unsupported, it tries a `creatorContentType==SHORTS|VIDEO_ON_DEMAND` filter, then falls back to an unfiltered top 2,000 ranking classified by a playback-details query (`dimensions=video,creatorContentType` plus `filters=video==ID,...`)
-- One paginated `reports.query` per selected top video with `dimensions=day` and `filters=video==VIDEO_ID` for cumulative history
+- `reports.query` with `dimensions=day,creatorContentType` for content-filter totals, including subscriber gains/losses per content type
+- `reports.query` for top videos: first tries `dimensions=video,creatorContentType`; if unsupported, it tries a `creatorContentType==SHORTS|VIDEO_ON_DEMAND` filter, then falls back to an unfiltered top 2,000 ranking classified by a playback-details query (`dimensions=video,creatorContentType` plus `filters=video==ID,...`). Top videos are sorted by `-views`, `-estimatedMinutesWatched`, or `-subscribersGained`; subscriber totals use `subscribersGained - subscribersLost`.
+- One paginated `reports.query` per selected top video with `dimensions=day` and `filters=video==VIDEO_ID` for cumulative history in the selected metric
 - `videos.list` for titles of the selected top videos
 - `channels.list?mine=true` for the channel name, avatar, and current subscriber count
 

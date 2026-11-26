@@ -634,6 +634,7 @@
       <select id="videoMetric">
         <option value="views" selected>Views</option>
         <option value="watch">Watch time (hours)</option>
+        <option value="subscribers">Subscribers</option>
       </select>
     </div>
     <div class="field">
@@ -784,6 +785,33 @@
     var t = String(type || "").toUpperCase();
     if (t === "SHORTS" || t === "LIVE_STREAM" || t === "STORY") return t;
     return "VIDEO_ON_DEMAND";
+  }
+  function metricKey(value) {
+    return value === "watch" || value === "subscribers" ? value : "views";
+  }
+  function metricName(metric) {
+    if (metric === "watch") return "watch time";
+    if (metric === "subscribers") return "subscribers";
+    return "views";
+  }
+  function metricSort(metric) {
+    if (metric === "watch") return "-estimatedMinutesWatched";
+    if (metric === "subscribers") return "-subscribersGained";
+    return "-views";
+  }
+  function metricApiMetrics() {
+    return "views,estimatedMinutesWatched,subscribersGained,subscribersLost";
+  }
+  function metricValue(row, metric) {
+    if (!row) return 0;
+    if (metric === "watch") return num(row.minutes) / 60;
+    if (metric === "subscribers") return num(row.gained) - num(row.lost);
+    return num(row.views);
+  }
+  function metricText(value, metric) {
+    if (metric === "watch") return fmtHours(value);
+    if (metric === "subscribers") return fmtSigned(value) + " subscribers";
+    return fmtInt(value) + " views";
   }
   function splitBucket(type) {
     if (type === "SHORTS") return "SHORTS";
@@ -1127,7 +1155,7 @@
     return analytics({
       startDate: start,
       endDate: end,
-      metrics: "views,estimatedMinutesWatched",
+      metrics: metricApiMetrics(),
       dimensions: "day,creatorContentType",
       sort: "day",
       maxResults: 5000
@@ -1143,7 +1171,7 @@
     var typeEl = $("videoType");
     var topEl = $("videoTop");
     return {
-      metric: metricEl && metricEl.value === "watch" ? "watch" : "views",
+      metric: metricKey(metricEl && metricEl.value),
       type: typeEl && typeEl.value ? typeEl.value : "all",
       top: Math.max(1, Math.min(20, Number(topEl && topEl.value) || 10))
     };
@@ -1237,7 +1265,7 @@
     });
   }
   function fetchPlainRanking(start, end, metric, limit) {
-    var sort = metric === "watch" ? "-estimatedMinutesWatched" : "-views";
+    var sort = metricSort(metric);
     var pageSize = 200;
     var rows = [];
     var startIndex = 1;
@@ -1246,7 +1274,7 @@
       return analytics({
         startDate: start,
         endDate: end,
-        metrics: "views,estimatedMinutesWatched",
+        metrics: metricApiMetrics(),
         dimensions: "video",
         sort: sort,
         startIndex: startIndex,
@@ -1258,7 +1286,9 @@
             id: String(r[0]),
             type: "",
             views: num(r[1]),
-            minutes: num(r[2])
+            minutes: num(r[2]),
+            gained: num(r[3]),
+            lost: num(r[4])
           });
         });
         startIndex += page.length;
@@ -1293,12 +1323,12 @@
     });
   }
   function fetchFilteredRanking(start, end, metric, type) {
-    var sort = metric === "watch" ? "-estimatedMinutesWatched" : "-views";
+    var sort = metricSort(metric);
     var wanted = type === "shorts" ? "SHORTS" : "VIDEO_ON_DEMAND";
     return analytics({
       startDate: start,
       endDate: end,
-      metrics: "views,estimatedMinutesWatched",
+      metrics: metricApiMetrics(),
       dimensions: "video",
       filters: "creatorContentType==" + wanted,
       sort: sort,
@@ -1309,7 +1339,9 @@
           id: String(r[0]),
           type: wanted,
           views: num(r[1]),
-          minutes: num(r[2])
+          minutes: num(r[2]),
+          gained: num(r[3]),
+          lost: num(r[4])
         };
       });
       return { rows: rows, typeUnavailable: false, typeError: null };
@@ -1324,17 +1356,15 @@
         throw err;
       });
     }
-    var sort = metric === "watch" ? "-estimatedMinutesWatched" : "-views";
-    var selectedMetric = metric === "watch" ? "estimatedMinutesWatched" : "views";
+    var sort = metricSort(metric);
     var base = {
       startDate: start,
       endDate: end,
       maxResults: 200
     };
     var attempts = [
-      { dimensions: "video,creatorContentType", metrics: "views,estimatedMinutesWatched", sort: sort, typeUnavailable: false, idIndex: 0, typeIndex: 1, viewsIndex: 2, minutesIndex: 3 },
-      { dimensions: "creatorContentType,video", metrics: "views,estimatedMinutesWatched", sort: sort, typeUnavailable: false, idIndex: 1, typeIndex: 0, viewsIndex: 2, minutesIndex: 3 },
-      { dimensions: "video,creatorContentType", metrics: selectedMetric, sort: sort, typeUnavailable: false, idIndex: 0, typeIndex: 1, viewsIndex: metric === "watch" ? null : 2, minutesIndex: metric === "watch" ? 2 : null }
+      { dimensions: "video,creatorContentType", metrics: metricApiMetrics(), sort: sort, idIndex: 0, typeIndex: 1, viewsIndex: 2, minutesIndex: 3, gainedIndex: 4, lostIndex: 5 },
+      { dimensions: "creatorContentType,video", metrics: metricApiMetrics(), sort: sort, idIndex: 1, typeIndex: 0, viewsIndex: 2, minutesIndex: 3, gainedIndex: 4, lostIndex: 5 }
     ];
 
     function attempt(index) {
@@ -1348,8 +1378,10 @@
           return {
             id: String(r[options.idIndex]),
             type: contentFilterType(rawType(r[options.typeIndex])),
-            views: options.viewsIndex == null ? 0 : num(r[options.viewsIndex]),
-            minutes: options.minutesIndex == null ? 0 : num(r[options.minutesIndex])
+            views: num(r[options.viewsIndex]),
+            minutes: num(r[options.minutesIndex]),
+            gained: num(r[options.gainedIndex]),
+            lost: num(r[options.lostIndex])
           };
         });
         return { rows: rows, typeUnavailable: false, typeError: null };
@@ -1379,7 +1411,7 @@
       return analytics({
         startDate: start,
         endDate: end,
-        metrics: "views,estimatedMinutesWatched",
+        metrics: metricApiMetrics(),
         dimensions: "day",
         filters: "video==" + id,
         sort: "day",
@@ -1488,12 +1520,14 @@
       var date = String(row[0]);
       var bucket = splitBucket(rawType(row[1]));
       var entry = splitMap[date] || {
-        SHORTS: 0, SHORTS_MIN: 0,
-        VIDEO_ON_DEMAND: 0, VIDEO_ON_DEMAND_MIN: 0,
-        OTHER: 0, OTHER_MIN: 0
+        SHORTS: 0, SHORTS_MIN: 0, SHORTS_GAINED: 0, SHORTS_LOST: 0,
+        VIDEO_ON_DEMAND: 0, VIDEO_ON_DEMAND_MIN: 0, VIDEO_ON_DEMAND_GAINED: 0, VIDEO_ON_DEMAND_LOST: 0,
+        OTHER: 0, OTHER_MIN: 0, OTHER_GAINED: 0, OTHER_LOST: 0
       };
       entry[bucket] += num(row[2]);
       entry[bucket + "_MIN"] += num(row[3]);
+      entry[bucket + "_GAINED"] += num(row[4]);
+      entry[bucket + "_LOST"] += num(row[5]);
       splitMap[date] = entry;
     });
     var splitAvailable = (input.split || []).length > 0 && daily.length > 0;
@@ -1520,6 +1554,20 @@
       var residual = r.minutes - (shortsMinutes[i] + videosMinutes[i] + base);
       return Math.max(0, base + residual);
     });
+    var subsShorts = daily.map(function (r) {
+      var entry = splitMap[r.date] || {};
+      return num(entry.SHORTS_GAINED) - num(entry.SHORTS_LOST);
+    });
+    var subsVideos = daily.map(function (r) {
+      var entry = splitMap[r.date] || {};
+      return num(entry.VIDEO_ON_DEMAND_GAINED) - num(entry.VIDEO_ON_DEMAND_LOST);
+    });
+    var subsOther = daily.map(function (r, i) {
+      var entry = splitMap[r.date] || {};
+      var base = num(entry.OTHER_GAINED) - num(entry.OTHER_LOST);
+      var residual = (r.gained - r.lost) - (subsShorts[i] + subsVideos[i] + base);
+      return base + residual;
+    });
 
     var cumulativeOf = function (values) {
       var total = 0;
@@ -1534,6 +1582,8 @@
     var cumulativeVideos = cumulativeOf(videos);
     var cumulativeShortsMinutes = cumulativeOf(shortsMinutes);
     var cumulativeVideosMinutes = cumulativeOf(videosMinutes);
+    var cumulativeSubsShorts = cumulativeOf(subsShorts);
+    var cumulativeSubsVideos = cumulativeOf(subsVideos);
 
     var seen = {};
     var top = (input.top || []).filter(function (v) {
@@ -1547,6 +1597,8 @@
         type: v.type,
         views: v.views,
         minutes: v.minutes,
+        gained: v.gained,
+        lost: v.lost,
         title: meta.title || v.id,
         thumb: meta.thumb || ("https://i.ytimg.com/vi/" + encodeURIComponent(v.id) + "/mqdefault.jpg")
       };
@@ -1587,12 +1639,17 @@
       shortsMinutes: shortsMinutes,
       videosMinutes: videosMinutes,
       otherMinutes: otherMinutes,
+      subsShorts: subsShorts,
+      subsVideos: subsVideos,
+      subsOther: subsOther,
       cumulative: cumulative,
       cumulativeMinutes: cumulativeMinutes,
       cumulativeShorts: cumulativeShorts,
       cumulativeVideos: cumulativeVideos,
       cumulativeShortsMinutes: cumulativeShortsMinutes,
       cumulativeVideosMinutes: cumulativeVideosMinutes,
+      cumulativeSubsShorts: cumulativeSubsShorts,
+      cumulativeSubsVideos: cumulativeSubsVideos,
       splitAvailable: splitAvailable,
       top: top,
       topError: input.topError,
@@ -1615,14 +1672,19 @@
 
   function buildVideoChartData(model, history) {
     var opts = history.opts || currentVideoOptions();
-    var metric = opts.metric === "watch" ? "watch" : "views";
-    var unit = metric === "watch" ? "hours" : "views";
+    var metric = metricKey(opts.metric);
+    var unit = metric === "watch" ? "hours" : (metric === "subscribers" ? "subscribers" : "views");
     var labels = model.daily.map(function (row) { return row.date; });
     var byId = {};
     (history.daily || []).forEach(function (entry) {
       var map = {};
       (entry.rows || []).forEach(function (row) {
-        map[String(row[0])] = { views: num(row[1]), minutes: num(row[2]) };
+        map[String(row[0])] = {
+          views: num(row[1]),
+          minutes: num(row[2]),
+          gained: num(row[3]),
+          lost: num(row[4])
+        };
       });
       byId[entry.id] = map;
     });
@@ -1630,8 +1692,8 @@
       var running = 0;
       var data = labels.map(function (date) {
         var row = byId[video.id] && byId[video.id][date];
-        running += row ? (metric === "watch" ? row.minutes : row.views) : 0;
-        return metric === "watch" ? Math.round((running / 60) * 100) / 100 : running;
+        running += row ? metricValue(row, metric) : 0;
+        return metric === "watch" ? Math.round(running * 100) / 100 : running;
       });
       var meta = (history.meta && history.meta[video.id]) || {};
       return {
@@ -1664,6 +1726,10 @@
       if (total) {
         total = total.map(function (value) { return Math.round((value / 60) * 100) / 100; });
       }
+    } else if (metric === "subscribers") {
+      if (opts.type === "all") total = model.subscriberNetCumulative.slice();
+      else if (opts.type === "video" && model.splitAvailable) total = model.cumulativeSubsVideos.slice();
+      else if (opts.type === "shorts" && model.splitAvailable) total = model.cumulativeSubsShorts.slice();
     } else if (opts.type === "all") {
       total = model.cumulative.slice();
     } else if (opts.type === "video" && model.splitAvailable) {
@@ -1807,7 +1873,7 @@
   function renderDailyChart(model) {
     var video = model.videoChart;
     var metric = video ? video.metric : "views";
-    var metricLabel = metric === "watch" ? "watch time" : "views";
+    var metricLabel = metricName(metric);
     var labels = video ? video.labels : [];
     var total = video ? video.total : [];
     var daily = total.map(function (value, index) {
@@ -1830,7 +1896,7 @@
       },
       options: baseOptions(model, {
         tooltipLabel: function (item) {
-          return metric === "watch" ? fmtHours(item.parsed.y) : fmtInt(item.parsed.y) + " views";
+          return metricText(item.parsed.y, metric);
         }
       })
     });
@@ -1839,7 +1905,7 @@
   function renderTotalChart(model) {
     var video = model.videoChart;
     var metric = video ? video.metric : "views";
-    var metricLabel = metric === "watch" ? "watch time" : "views";
+    var metricLabel = metricName(metric);
     var labels = video ? video.labels : [];
     var total = video ? video.total : [];
     $("totalTitle").textContent = "Channel total cumulative " + metricLabel;
@@ -1861,7 +1927,7 @@
       },
       options: baseOptions(model, {
         tooltipLabel: function (item) {
-          return metric === "watch" ? fmtHours(item.parsed.y) : fmtInt(item.parsed.y) + " views";
+          return metricText(item.parsed.y, metric);
         }
       })
     });
@@ -1870,7 +1936,7 @@
   function renderVideoChart(model) {
     var video = model.videoChart;
     var metric = video ? video.metric : "views";
-    var metricLabel = metric === "watch" ? "watch time" : "views";
+    var metricLabel = metricName(metric);
     $("videoChartTitle").textContent = "Cumulative " + metricLabel + " per video";
     if (!video || !video.series.length) {
       makeChart("videoChart", {
@@ -1921,7 +1987,7 @@
         legend: true,
         tooltipLabel: function (item) {
           var label = item.dataset.fullTitle || item.dataset.label;
-          return label + ": " + (metric === "watch" ? fmtHours(item.parsed.y) : fmtInt(item.parsed.y) + " views");
+          return label + ": " + metricText(item.parsed.y, metric);
         }
       })
     });
@@ -2019,15 +2085,15 @@
     }
     var metric = video.metric;
     var all = video.series.slice(0, 10);
-    var maxTotal = Math.max.apply(null, all.map(function (item) { return item.total; }).concat([1]));
+    var maxTotal = Math.max.apply(null, all.map(function (item) { return Math.abs(item.total); }).concat([1]));
     list.innerHTML = all.map(function (item, index) {
       var color = item.color || PALETTE[index % PALETTE.length];
-      var width = Math.max(2, (item.total / maxTotal) * 100);
+      var width = Math.max(2, (Math.abs(item.total) / maxTotal) * 100);
       var label = TYPE_LABEL[item.type] || "";
       var badge = label
         ? '<span class="badge ' + (TYPE_CLASS[item.type] || "other") + '">' + label.toUpperCase() + "</span>"
         : "";
-      var value = metric === "watch" ? fmtHours(item.total) : fmtInt(item.total);
+      var value = metricText(item.total, metric);
       return '<div class="video-item">' +
         '<div class="video-title">' + badge + escapeHtml(item.title) + "</div>" +
         '<div class="video-meta"><span>' + escapeHtml(item.id) + "</span><span>" + value + "</span></div>" +
@@ -2060,14 +2126,14 @@
 
     var video = model.videoChart;
     var metric = video ? video.metric : "views";
-    var metricLabel = metric === "watch" ? "watch time" : "views";
+    var metricLabel = metricName(metric);
     var selectedTotal = video && video.total && video.total.length
       ? video.total[video.total.length - 1]
       : null;
 
     $("kpiTotalLabel").textContent = "Total " + metricLabel;
     $("kpiTotal").textContent = selectedTotal != null
-      ? (metric === "watch" ? fmtHours(selectedTotal) : fmtInt(selectedTotal))
+      ? metricText(selectedTotal, metric)
       : "-";
     $("kpiVideos").textContent = video ? fmtInt(video.videoCount) : "-";
     $("kpiDays").textContent = fmtInt(model.daily.length);
@@ -2113,6 +2179,14 @@
     document.body.appendChild(link);
     link.click();
     link.remove();
+  }
+  function metricDownloadName(name, metric) {
+    if (!metric || metric === "views") return name;
+    var suffix = metric === "watch" ? "watch-time" : "subscribers";
+    if (name === "views-by-video") return suffix + "-by-video";
+    if (name === "channel-total") return "channel-total-" + suffix;
+    if (name === "daily-activity") return "daily-" + suffix;
+    return name;
   }
 
   function showUpdatedStatus(model) {
@@ -2376,7 +2450,8 @@
     });
     document.querySelectorAll("button[data-chart]").forEach(function (button) {
       button.addEventListener("click", function () {
-        downloadChart(button.dataset.chart, button.dataset.name);
+        var metric = currentData && currentData.videoChart && currentData.videoChart.metric;
+        downloadChart(button.dataset.chart, metricDownloadName(button.dataset.name, metric));
       });
     });
 
