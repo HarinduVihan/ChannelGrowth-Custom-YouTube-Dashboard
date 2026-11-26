@@ -1,6 +1,6 @@
 # Channel Growth
 
-A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, subscriber changes, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
+A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, net subscriber contribution, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
 
 Live site: <https://channelgrowth.me/>
 
@@ -8,14 +8,14 @@ Live site: <https://channelgrowth.me/>
 
 YouTube Studio shows aggregate channel numbers, but it does not clearly answer **what is driving growth over time**. This project was built to answer questions like:
 
-- Which individual videos contribute most to cumulative views and watch time?
+- Which individual videos contribute most to cumulative views, watch time, and net subscribers?
 - Are **Shorts** or **long-form videos** driving growth?
 - How is the channel's subscriber count growing, and when do spikes happen?
 - Can all of this be explored locally, with filters and live data?
 
 ## Solution
 
-A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video, and serves an interactive web dashboard with filters for **All / Videos / Shorts**.
+A local dashboard for exploring how individual YouTube videos contribute to a channel's growth over time. It pulls daily views, watch time, and subscriber activity from the **YouTube APIs**, builds cumulative charts per video for views, watch time, or net subscribers, and adds a content calendar for scheduled and past uploads with filters for **All / Videos / Shorts**.
 
 <img width="1586" height="1296" alt="image" src="https://github.com/user-attachments/assets/6afaacb9-aff7-461e-bbe3-d499f37d47a9" />
 
@@ -34,19 +34,25 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 ## Features
 
 - Google sign-in with read-only access to the user's own channel (`channel==MINE`)
-- Dashboard layout with KPI cards for total views/watch time, videos tracked, days, data through, and subscribers
-- Global Views/Watch time metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
+- Dashboard layout with KPI cards for the selected metric, videos tracked, days, data through, and subscribers
+- Global Views/Watch time/Subscribers metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
+- Subscribers metric is net subscribers (`subscribersGained - subscribersLost`) and can go negative
 - Regular videos reported as `UNSPECIFIED` by Google are included in the Videos filter and totals
-- Per-video cumulative views or watch time with an "Other videos" residual line
-- Channel total cumulative views or watch time
-- Daily views or watch time
+- Per-video cumulative views, watch time, or net subscribers with an "Other videos" residual line
+- Channel total cumulative views, watch time, or net subscribers
+- Daily views, watch time, or net subscribers
 - Subscriber total over time, estimated from daily gains/losses, anchored to the current count, and clamped at zero
 - Daily subscribers gained/lost chart
-- Top-videos sidebar with type badges, IDs, totals, and progress bars
+- Content schedule page with auto-synced upcoming videos, Shorts, and premieres plus past upload dates
+- Calendar and timeline views with type/status filters and open slots inferred from your upload cadence
+- Top-videos sidebar with type badges, IDs, signed totals, and progress bars
 - PNG download for every chart
 - Start/end date controls; the initial range starts at the channel creation date
 - CSV export of the current range
 - Channel avatar and name in the header, with sign-out; logo/title refreshes the dashboard
+- Metric-aware PNG filenames for views, watch time, and subscribers
+- Left-aligned Analytics/Content navigation pills with the active page highlighted
+- Accent-styled Refresh from YouTube button on both pages
 - Clear loading, empty, quota, permission, and expired-session states
 
 ## Local development
@@ -73,7 +79,7 @@ python scripts/build_static.py
 The build cleans `dist/` and copies:
 
 - `dashboard.html` -> `index.html` and `dashboard.html`
-- `privacy.html`, `terms.html`, `config.js`
+- `content.html`, `privacy.html`, `terms.html`, `config.js`
 - `vendor/chart.umd.min.js` and its license
 - `.nojekyll`
 - `CNAME` when a domain is configured
@@ -96,13 +102,17 @@ python -m http.server 8080 --directory dist
 Each dashboard load makes a mix of channel-level and bounded per-video requests:
 
 - `reports.query` with `dimensions=day` for daily views, watch minutes, subscribers gained, and subscribers lost
-- `reports.query` with `dimensions=day,creatorContentType` for content-filter totals
-- `reports.query` for top videos: first tries `dimensions=video,creatorContentType`; if unsupported, it tries a `creatorContentType==SHORTS|VIDEO_ON_DEMAND` filter, then falls back to an unfiltered top 2,000 ranking classified by a playback-details query (`dimensions=video,creatorContentType` plus `filters=video==ID,...`)
-- One paginated `reports.query` per selected top video with `dimensions=day` and `filters=video==VIDEO_ID` for cumulative history
+- `reports.query` with `dimensions=day,creatorContentType` for content-filter totals, including subscriber gains/losses per content type
+- `reports.query` for top videos: first tries `dimensions=video,creatorContentType`; if unsupported, it tries a `creatorContentType==SHORTS|VIDEO_ON_DEMAND` filter, then falls back to an unfiltered top 2,000 ranking classified by a playback-details query (`dimensions=video,creatorContentType` plus `filters=video==ID,...`). Top videos are sorted by `-views`, `-estimatedMinutesWatched`, or `-subscribersGained`; subscriber totals use `subscribersGained - subscribersLost`.
+- One paginated `reports.query` per selected top video with `dimensions=day` and `filters=video==VIDEO_ID` for cumulative history in the selected metric
 - `videos.list` for titles of the selected top videos
-- `channels.list?mine=true` for the channel name, avatar, and current subscriber count
+- `channels.list?mine=true` for the channel name, avatar, uploads playlist, and current subscriber count
+- `playlistItems.list` on the channel's uploads playlist for video IDs, including private and scheduled uploads
+- `videos.list?part=snippet,contentDetails,status,liveStreamingDetails` in batches of 50 for the content page: titles, thumbnails, durations, privacy, `status.publishAt`, and premiere/live start times
 
 Per-video history is deliberately bounded to the selected top 5/10/15/20 videos rather than fanning out over every upload. Larger Top-N values, long date ranges, and changing the metric/type controls use additional API quota. Successful per-video daily responses are cached for the current date range while the tab is open. If the top-videos content-type report is unsupported, the app first tries a per-type top-videos filter, then classifies up to 2,000 ranked videos via a playback-details query (or per-video fallback) before showing a notice. Google may report regular videos as `UNSPECIFIED`; those are treated as `VIDEO_ON_DEMAND` for the Videos filter and its totals.
+
+The content page paginates the uploads playlist and batches video metadata in groups of 50. It treats `status.publishAt` or a premiere's `scheduledStartTime` as the scheduled date, uses `contentDetails.duration` of 180 seconds or less to identify Shorts, and infers open slots from the median gap and most common weekday of published uploads. It never writes to YouTube and does not require manual entries.
 
 YouTube Analytics data typically lags one to two days. All visitors share the Cloud project's API quota; there is no server-side rate limiting because there is no server. If the project runs out of quota, the app shows a quota message and users can retry later.
 
@@ -136,6 +146,7 @@ The GitHub Actions workflow no longer uses `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN
 │   └── plot_growth.py         # legacy channel-total chart
 ├── web/
 │   ├── dashboard.html         # sign-in, live API fetches, charts, top videos
+│   ├── content.html           # sign-in, upload calendar, timeline, open slots
 │   ├── config.js              # public Web OAuth client ID + scopes
 │   ├── privacy.html           # privacy policy
 │   ├── terms.html             # terms of service
@@ -159,6 +170,7 @@ The GitHub Actions workflow no longer uses `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN
 - **No channel analytics** — use an account that owns or manages the channel, and confirm the YouTube Analytics API is enabled for the project.
 - **Videos filter looks empty but Shorts works** — Google may label regular videos as `UNSPECIFIED`; the app treats those as Videos. If the notice still appears, check `window.__lastTypeError` in DevTools.
 - **Top videos show IDs only** — the YouTube Data API v3 may be disabled or the quota may be exhausted; titles and thumbnails fall back to IDs and static thumbnail URLs.
+- **A scheduled upload is missing from Content** — the page can only show items YouTube exposes through the uploads playlist and `status.publishAt` or `liveStreamingDetails`. Items not exposed by the API cannot be added manually.
 - **No recent days** — normal. YouTube Analytics usually reports with a one- to two-day delay.
 - **Session expired** — sign in again. Browser token-client sessions last about an hour and do not use refresh tokens.
 - **Charts do not render** — confirm `web/vendor/chart.umd.min.js` was copied into `dist/vendor/` and that JavaScript is enabled.

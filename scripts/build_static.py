@@ -8,6 +8,7 @@ DIST = BASE / "dist"
 
 REQUIRED = (
     "dashboard.html",
+    "content.html",
     "privacy.html",
     "terms.html",
     "config.js",
@@ -47,6 +48,7 @@ def main():
 
     shutil.copy2(WEB / "dashboard.html", DIST / "index.html")
     shutil.copy2(WEB / "dashboard.html", DIST / "dashboard.html")
+    shutil.copy2(WEB / "content.html", DIST / "content.html")
     shutil.copy2(WEB / "privacy.html", DIST / "privacy.html")
     shutil.copy2(WEB / "terms.html", DIST / "terms.html")
     shutil.copy2(WEB / "config.js", DIST / "config.js")
