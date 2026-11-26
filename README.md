@@ -50,6 +50,9 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 - Start/end date controls; the initial range starts at the channel creation date
 - CSV export of the current range
 - Channel avatar and name in the header, with sign-out; logo/title refreshes the dashboard
+- Metric-aware PNG filenames for views, watch time, and subscribers
+- Left-aligned Analytics/Content navigation pills with the active page highlighted
+- Accent-styled Refresh from YouTube button on both pages
 - Clear loading, empty, quota, permission, and expired-session states
 
 ## Local development
