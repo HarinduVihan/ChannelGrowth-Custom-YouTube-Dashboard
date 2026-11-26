@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Private, browser-only YouTube upload calendar for scheduled videos, Shorts, and past upload cadence." />
+<meta name="color-scheme" content="dark" />
+<title>Channel Growth - Content schedule</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f1115'/%3E%3Cpath d='M38 28l30 22-30 22z' fill='%23ff0033'/%3E%3C/svg%3E" />
+<script src="config.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f232c;
+    --panel-3: #252a35;
+    --text: #e8eaed;
+    --muted: #8b93a1;
+    --muted-2: #6f7785;
+    --accent: #ff0033;
+    --accent-soft: rgba(255, 0, 51, 0.12);
+    --blue: #3ba0ff;
+    --green: #34d399;
+    --yellow: #ffd76b;
+    --red: #f87171;
+    --border: #2a2f3a;
+    --border-soft: rgba(255, 255, 255, 0.06);
+    --radius: 14px;
+    --shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(620px 420px at 12% -5%, rgba(255, 0, 51, 0.13), transparent 65%),
+      radial-gradient(760px 520px at 100% 5%, rgba(59, 160, 255, 0.1), transparent 65%);
+  }
+  a { color: #8ab4ff; }
+  button, select { font: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 14px 26px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(15, 17, 21, 0.82);
+    backdrop-filter: blur(14px);
+  }
+  .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; }
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    padding-left: 2px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(255, 0, 51, 0.25);
+  }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+  .brand-text strong { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+  .brand-text small { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .topbar-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .page-nav { display: flex; align-items: center; gap: 7px; }
+  .page-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 13px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 650;
+    text-decoration: none;
+  }
+  .page-link:hover { color: var(--text); border-color: #49505e; background: var(--panel-3); }
+  .page-link.active { color: #fff; border-color: var(--accent); background: var(--accent-soft); }
+  .header-right { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+  .account { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .account img { width: 34px; height: 34px; border-radius: 50%; background: var(--panel-2); object-fit: cover; border: 1px solid var(--border); }
+  .account-meta { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  .account-meta strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+  .account-meta span { color: var(--muted); font-size: 11px; }
+
+  .gate {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: clamp(34px, 8vh, 90px) 24px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    min-height: calc(100vh - 64px);
+  }
+  .gate-card {
+    width: 100%;
+    padding: clamp(24px, 4vw, 42px);
+    background: linear-gradient(180deg, rgba(31, 35, 44, 0.96), rgba(23, 26, 33, 0.96));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+  }
+  .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+  h1 { margin: 10px 0 12px; font-size: clamp(28px, 4vw, 40px); line-height: 1.12; letter-spacing: -0.025em; }
+  .lede { color: #c8cdd6; font-size: 15px; max-width: 620px; }
+  .checks { list-style: none; padding: 0; margin: 22px 0 26px; display: grid; gap: 10px; color: #d3d7de; font-size: 13.5px; }
+  .checks li::before { content: "✓"; color: var(--green); font-weight: 700; margin-right: 10px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 0;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  button:hover:not(:disabled) { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .refresh-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 650;
+    box-shadow: 0 6px 18px rgba(255, 0, 51, 0.2);
+  }
+  .refresh-button::before { content: "\21bb"; font-size: 16px; line-height: 1; }
+  .primary, .ghost, button.mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: opacity 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .primary { background: var(--accent); color: #fff; box-shadow: 0 8px 24px rgba(255, 0, 51, 0.22); }
+  .primary:hover:not(:disabled) { opacity: 0.92; }
+  .ghost, button.mini { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+  .ghost:hover:not(:disabled), button.mini:hover:not(:disabled) { border-color: #49505e; background: var(--panel-3); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .gate-status { color: var(--muted); font-size: 13px; margin: 16px 0 0; }
+  .gate-status.err { color: var(--red); }
+  .fine { color: var(--muted-2); font-size: 11.5px; margin: 12px 0 0; }
+  .notice { border-radius: 10px; padding: 11px 13px; font-size: 12.5px; margin-top: 14px; }
+  .notice.warn { background: rgba(255, 215, 107, 0.08); border: 1px solid rgba(255, 215, 107, 0.25); color: #ffd76b; }
+  .notice.error { background: rgba(248, 113, 113, 0.08); border: 1px solid rgba(248, 113, 113, 0.25); color: #ffb4b4; }
+  .gate-foot { color: var(--muted-2); font-size: 11.5px; }
+  .gate-foot a { color: var(--muted); }
+
+  .wrap { max-width: 1300px; margin: 0 auto; padding: 20px 26px 44px; }
+  .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  }
+  .kpi { padding: 15px 16px; min-height: 106px; }
+  .label { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .value { font-size: 25px; font-weight: 680; letter-spacing: -0.02em; margin-top: 7px; }
+  .sub { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: 14px 0;
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-width: 120px;
+  }
+  .month-nav { display: flex; align-items: center; gap: 7px; }
+  .month-nav strong { min-width: 138px; text-align: center; font-size: 13px; }
+  .status { color: var(--muted); font-size: 12px; margin-left: auto; }
+  .status.err { color: var(--red); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(290px, 0.85fr); gap: 14px; align-items: start; }
+  .calendar-card, .side-card, .timeline-card { padding: 16px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .section-head h2, .side-card h2 { font-size: 14px; margin: 0; letter-spacing: -0.01em; }
+  .section-head span { color: var(--muted); font-size: 11.5px; }
+  .weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
+  .weekdays span { color: var(--muted-2); font-size: 10px; text-align: center; text-transform: uppercase; letter-spacing: 0.08em; }
+  .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .calendar-day {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-height: 88px;
+    padding: 7px;
+    color: var(--text);
+    text-align: left;
+    background: var(--panel-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 9px;
+    cursor: pointer;
+  }
+  .calendar-day:hover { border-color: #49505e; }
+  .calendar-day.other { opacity: 0.38; }
+  .calendar-day.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-soft); }
+  .calendar-day.selected { background: var(--panel-3); border-color: var(--blue); }
+  .calendar-date { font-size: 11px; color: var(--muted); }
+  .calendar-day.today .calendar-date { color: var(--accent); font-weight: 700; }
+  .calendar-items { display: flex; flex-direction: column; gap: 3px; width: 100%; }
+  .cal-pill, .more {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 5px;
+    padding: 2px 5px;
+    font-size: 9.5px;
+    font-weight: 600;
+  }
+  .cal-pill.short { background: rgba(52, 211, 153, 0.16); color: #7ee7bd; }
+  .cal-pill.video { background: rgba(59, 160, 255, 0.16); color: #93c8ff; }
+  .cal-pill.live { background: rgba(255, 215, 107, 0.14); color: var(--yellow); }
+  .cal-pill.scheduled { outline: 1px dashed currentColor; }
+  .cal-pill.private { opacity: 0.62; }
+  .more { color: var(--muted); background: rgba(255, 255, 255, 0.04); }
+
+  .side-card { display: grid; gap: 18px; }
+  .day-list, .slot-list { display: grid; gap: 8px; margin-top: 10px; }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 14px 4px; text-align: center; }
+  .slot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 11px;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .slot:hover { border-color: var(--accent); }
+  .slot span { color: var(--muted); font-size: 11px; }
+
+  .timeline-card { margin-top: 14px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 11px; }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .tl-group + .tl-group { margin-top: 18px; border-top: 1px solid var(--border-soft); padding-top: 16px; }
+  .group-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 9px; }
+  .tl-item {
+    display: grid;
+    grid-template-columns: 46px 56px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 4px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .tl-item:last-child { border-bottom: 0; }
+  .tl-date { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+  .tl-date strong { font-size: 15px; }
+  .tl-date span { color: var(--muted); font-size: 9.5px; text-transform: uppercase; }
+  .thumb { width: 56px; height: 32px; object-fit: cover; border-radius: 5px; background: var(--panel-2); }
+  .tl-title { min-width: 0; }
+  .tl-title strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; }
+  .tl-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; color: var(--muted); font-size: 10.5px; }
+  .badge { border-radius: 5px; padding: 2px 6px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge.video { background: rgba(59, 160, 255, 0.16); color: #93c8ff; }
+  .badge.short { background: rgba(52, 211, 153, 0.16); color: #7ee7bd; }
+  .badge.live { background: rgba(255, 215, 107, 0.14); color: var(--yellow); }
+  .badge.scheduled { background: rgba(255, 0, 51, 0.14); color: #ff6b8a; }
+  .badge.private { background: rgba(139, 147, 161, 0.16); color: #b5bcc7; }
+  .badge.published { background: rgba(52, 211, 153, 0.12); color: #7ee7bd; }
+  .tl-link { color: var(--muted); font-size: 11px; text-decoration: none; }
+  .tl-link:hover { color: var(--text); }
+  .more-row { display: flex; justify-content: center; margin-top: 12px; }
+
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 20px;
+    margin-top: 14px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--muted-2);
+    font-size: 11.5px;
+  }
+  .site-footer a { color: var(--muted); }
+  .site-footer a:hover { color: var(--text); }
+
+  @media (max-width: 1050px) {
+    .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .layout { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 620px) {
+    .topbar { padding: 12px 16px; }
+    .wrap { padding: 14px 14px 36px; }
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .brand-text small { display: none; }
+    .status { margin-left: 0; flex-basis: 100%; }
+    .calendar { gap: 3px; }
+    .calendar-day { min-height: 72px; padding: 5px; }
+    .cal-pill { display: none; }
+    .tl-item { grid-template-columns: 40px minmax(0, 1fr) auto; }
+    .thumb { display: none; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-left">
+    <a class="brand" href="dashboard.html">
+      <span class="brand-mark" aria-hidden="true">&#9654;</span>
+      <span class="brand-text">
+        <strong>Channel Growth</strong>
+        <small>Content schedule</small>
+      </span>
+    </a>
+    <nav class="page-nav" aria-label="Pages">
+      <a class="page-link" href="dashboard.html">Analytics</a>
+      <a class="page-link active" href="content.html" aria-current="page">Content</a>
+    </nav>
+  </div>
+  <div class="header-right">
+    <div class="account" id="account" hidden>
+      <img id="accountAvatar" alt="" hidden />
+      <div class="account-meta">
+        <strong id="accountName">Connected channel</strong>
+        <span>Read-only access</span>
+      </div>
+      <button type="button" class="ghost" id="signOut">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="gate" id="gate">
+  <section class="gate-card">
+    <div class="eyebrow">Your channel, your browser</div>
+    <h1>See every upload and every open slot.</h1>
+    <p class="lede">
+      Connect the Google account that manages your channel to auto-sync scheduled videos,
+      Shorts, premieres, and your past upload cadence. No manual entries and no server-side storage.
+    </p>
+    <ul class="checks">
+      <li>Read-only access through Google</li>
+      <li>Scheduled times, titles, durations, and upload dates from the YouTube APIs</li>
+      <li>Open slots inferred from your own publishing rhythm</li>
+    </ul>
+    <button type="button" class="primary" id="connect">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.909c1.702-1.567 2.683-3.874 2.683-6.615z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.859-3.047.859-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9.001 9.001 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.963 10.706A5.41 5.41 0 0 1 3.682 9c0-.592.102-1.167.281-1.706V4.962H.956A9.001 9.001 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.582C13.463.892 11.426 0 9 0A9.001 9.001 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58z"/>
+      </svg>
+      Continue with Google
+    </button>
+    <p class="gate-status" id="gateStatus" role="status">Connect your Google account to load your content schedule.</p>
+    <p class="fine">You can revoke access at any time from your Google Account permissions page.</p>
+    <div class="notice warn" id="configNotice" hidden></div>
+  </section>
+  <p class="gate-foot"><a href="dashboard.html">Analytics</a> &middot; <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></p>
+</main>
+
+<main class="wrap" id="app" hidden>
+  <section class="kpis" aria-label="Content summary">
+    <div class="card kpi"><div class="label">Upcoming</div><div class="value" id="kpiUpcoming">-</div><div class="sub" id="kpiNext"></div></div>
+    <div class="card kpi"><div class="label">Next 30 days</div><div class="value" id="kpiWindow">-</div><div class="sub" id="kpiWindowSub">scheduled items</div></div>
+    <div class="card kpi"><div class="label">Typical gap</div><div class="value" id="kpiGap">-</div><div class="sub" id="kpiCadence"></div></div>
+    <div class="card kpi"><div class="label">Library items</div><div class="value" id="kpiLibrary">-</div><div class="sub" id="kpiLibrarySub"></div></div>
+    <div class="card kpi"><div class="label">Last upload</div><div class="value" id="kpiLast">-</div><div class="sub">published date from YouTube</div></div>
+  </section>
+
+  <div class="controls" aria-label="Content controls">
+    <div class="field">
+      <label for="contentFilter">Content</label>
+      <select id="contentFilter">
+        <option value="all" selected>All content</option>
+        <option value="video">Videos</option>
+        <option value="short">Shorts</option>
+        <option value="live">Premieres / live</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="statusFilter">Status</label>
+      <select id="statusFilter">
+        <option value="all" selected>All statuses</option>
+        <option value="scheduled">Upcoming</option>
+        <option value="published">Published</option>
+        <option value="private">Private drafts</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Month</label>
+      <div class="month-nav">
+        <button type="button" class="mini" id="prevMonth" aria-label="Previous month">&#8249;</button>
+        <strong id="monthLabel">Loading</strong>
+        <button type="button" class="mini" id="nextMonth" aria-label="Next month">&#8250;</button>
+        <button type="button" class="mini" id="todayMonth">Today</button>
+      </div>
+    </div>
+    <button type="button" class="refresh-button" id="refresh">Refresh from YouTube</button>
+    <div class="status" id="status" role="status">Loading...</div>
+  </div>
+  <div class="notice error" id="appError" hidden></div>
+
+  <div class="layout">
+    <section class="card calendar-card">
+      <div class="section-head">
+        <h2>Calendar</h2>
+        <span>Click a day to inspect it</span>
+      </div>
+      <div class="weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+      <div class="calendar" id="calendar"></div>
+    </section>
+    <aside class="card side-card">
+      <div>
+        <h2 id="dayTitle">Selected day</h2>
+        <div class="day-list" id="dayList"><div class="empty">No uploads or scheduled videos on this day.</div></div>
+      </div>
+      <div>
+        <h2>Open slots</h2>
+        <div class="slot-list" id="slotList"><div class="empty">Not enough upload history yet.</div></div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card timeline-card">
+    <div class="section-head">
+      <h2>Timeline</h2>
+      <div class="legend">
+        <span><i style="background:#3ba0ff"></i>Video</span>
+        <span><i style="background:#34d399"></i>Short</span>
+        <span><i style="background:#ffd76b"></i>Live / premiere</span>
+        <span><i style="background:#ff0033"></i>Scheduled</span>
+      </div>
+    </div>
+    <div id="timeline"></div>
+  </section>
+
+  <footer class="site-footer">
+    <span>Channel Growth &mdash; content metadata is processed in your browser and is not stored on our servers.</span>
+    <span><a href="dashboard.html">Analytics</a> &middot; <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var CFG = window.CHANNEL_GROWTH_CONFIG || {};
+  var CLIENT_ID = String(CFG.clientId || "").trim();
+  var SCOPES = Array.isArray(CFG.scopes) && CFG.scopes.length ? CFG.scopes : [
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+    "https://www.googleapis.com/auth/youtube.readonly"
+  ];
+  var PLACEHOLDER = !CLIENT_ID || /^REPLACE/i.test(CLIENT_ID) || !/\.apps\.googleusercontent\.com$/i.test(CLIENT_ID);
+  var TOKEN_KEY = "channel_growth_token";
+  var DATA_URL = "https://www.googleapis.com/youtube/v3/";
+  var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var state = {
+    token: null,
+    expires: 0,
+    timer: null,
+    client: null,
+    loader: null,
+    channel: null,
+    items: [],
+    filter: "all",
+    statusFilter: "all",
+    month: "",
+    day: "",
+    limit: 100,
+    seq: 0
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function num(value) { var n = Number(value); return Number.isFinite(n) ? n : 0; }
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function shortTitle(value, max) {
+    var text = String(value == null ? "" : value);
+    var limit = max || 30;
+    return text.length > limit ? text.slice(0, limit - 3) + "..." : text;
+  }
+  function pacificDate(value) {
+    var date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return "";
+    var parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+    var map = {};
+    parts.forEach(function (part) {
+      if (part.type !== "literal") map[part.type] = part.value;
+    });
+    return map.year + "-" + map.month + "-" + map.day;
+  }
+  function todayKey() { return pacificDate(new Date()); }
+  function addDays(isoDate, days) {
+    if (!isoDate) return "";
+    var d = new Date(isoDate + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+  function shiftMonth(ym, delta) {
+    var d = new Date(ym + "-01T12:00:00Z");
+    d.setUTCMonth(d.getUTCMonth() + delta);
+    return d.toISOString().slice(0, 7);
+  }
+  function weekdayOf(isoDate) { return new Date(isoDate + "T12:00:00Z").getUTCDay(); }
+  function monthName(ym) {
+    return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(ym + "-01T12:00:00Z"));
+  }
+  function fmtDate(isoDate) {
+    if (!isoDate) return "-";
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(isoDate + "T12:00:00Z"));
+  }
+  function fmtDateFull(isoDate) {
+    if (!isoDate) return "-";
+    return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(isoDate + "T12:00:00Z"));
+  }
+  function fmtTime(value) {
+    if (!value) return "";
+    var date = new Date(value);
+    if (isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit"
+    }).format(date);
+  }
+  function durationSeconds(value) {
+    var match = String(value || "").match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+    if (!match) return 0;
+    return num(match[1]) * 3600 + num(match[2]) * 60 + num(match[3]);
+  }
+  function fmtDuration(seconds) {
+    var total = Math.max(0, Math.round(num(seconds)));
+    var hours = Math.floor(total / 3600);
+    var minutes = Math.floor((total % 3600) / 60);
+    var secs = total % 60;
+    if (hours) return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+    return minutes + ":" + String(secs).padStart(2, "0");
+  }
+  function median(values) {
+    if (!values.length) return null;
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  function dayDiff(a, b) {
+    return Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000);
+  }
+
+  function defaultGateMessage() {
+    return PLACEHOLDER ? "This deployment is not configured yet." : "Connect your Google account to load your content schedule.";
+  }
+  function setGateStatus(message, isError) {
+    var el = $("gateStatus");
+    el.textContent = message || "";
+    el.className = "gate-status" + (isError ? " err" : "");
+  }
+  function setStatus(message, isError) {
+    var el = $("status");
+    el.textContent = message || "";
+    el.className = "status" + (isError ? " err" : "");
+  }
+  function showError(message) {
+    var el = $("appError");
+    el.textContent = message || "";
+    el.hidden = !message;
+  }
+  function hideError() { $("appError").hidden = true; }
+  function renderAccount(channel) {
+    var snippet = (channel && channel.snippet) || {};
+    var thumbs = snippet.thumbnails || {};
+    var avatar = (thumbs.default && thumbs.default.url) || (thumbs.medium && thumbs.medium.url) || "";
+    $("accountName").textContent = snippet.title || "Connected channel";
+    if (avatar) {
+      $("accountAvatar").src = avatar;
+      $("accountAvatar").hidden = false;
+    } else {
+      $("accountAvatar").hidden = true;
+    }
+  }
+  function readStoredToken() {
+    try {
+      var raw = sessionStorage.getItem(TOKEN_KEY);
+      if (!raw) return false;
+      var saved = JSON.parse(raw);
+      if (!saved || !saved.access_token || !saved.expires_at) return false;
+      if (Number(saved.expires_at) <= Date.now() + 30000) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        return false;
+      }
+      state.token = saved.access_token;
+      state.expires = Number(saved.expires_at);
+      return true;
+    } catch (err) {
+      try { sessionStorage.removeItem(TOKEN_KEY); } catch (ignored) { return false; }
+      return false;
+    }
+  }
+  function storeToken(response) {
+    state.token = response.access_token;
+    state.expires = Date.now() + (Number(response.expires_in) || 3600) * 1000;
+    try {
+      sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ access_token: state.token, expires_at: state.expires }));
+    } catch (err) { return; }
+    armTokenTimer();
+  }
+  function armTokenTimer() {
+    clearTimeout(state.timer);
+    var ms = state.expires - Date.now() - 30000;
+    if (ms > 0 && ms < 2147483647) {
+      state.timer = setTimeout(function () {
+        clearSession("Your Google session expired. Connect again to continue.", true);
+      }, ms);
+    }
+  }
+  function clearSession(message, isError) {
+    state.seq += 1;
+    clearTimeout(state.timer);
+    state.timer = null;
+    state.token = null;
+    state.expires = 0;
+    state.items = [];
+    state.channel = null;
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch (err) { return; }
+    $("account").hidden = true;
+    $("accountAvatar").hidden = true;
+    $("app").hidden = true;
+    $("gate").hidden = false;
+    $("connect").disabled = PLACEHOLDER;
+    $("refresh").disabled = false;
+    hideError();
+    setStatus("", false);
+    setGateStatus(message || defaultGateMessage(), !!isError);
+  }
+  function enterApp() {
+    $("gate").hidden = true;
+    $("app").hidden = false;
+    $("account").hidden = false;
+    $("accountName").textContent = "Loading channel...";
+    $("accountAvatar").hidden = true;
+    hideError();
+    load();
+  }
+  function loadGis() {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+    if (state.loader) return state.loader;
+    state.loader = new Promise(function (resolve, reject) {
+      var script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = function () { resolve(); };
+      script.onerror = function () {
+        state.loader = null;
+        reject(new Error("Could not load Google sign-in. Check your connection or content blockers."));
+      };
+      document.head.appendChild(script);
+    });
+    return state.loader;
+  }
+  function ensureTokenClient() {
+    return loadGis().then(function () {
+      var oauth2 = window.google && window.google.accounts && window.google.accounts.oauth2;
+      if (!oauth2) throw new Error("Google sign-in could not be initialized.");
+      if (!state.client) {
+        state.client = oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES.join(" "),
+          callback: onToken,
+          error_callback: onTokenError
+        });
+      }
+      return state.client;
+    });
+  }
+  function onToken(response) {
+    if (!response || response.error) {
+      onTokenError(response || { message: "Google sign-in failed." });
+      return;
+    }
+    if (!response.access_token) {
+      onTokenError({ message: "Google did not return an access token." });
+      return;
+    }
+    storeToken(response);
+    $("connect").disabled = false;
+    enterApp();
+  }
+  function friendlyAuthError(err) {
+    var type = err && (err.type || err.error);
+    if (type === "popup_closed") return "The Google sign-in window was closed. Try again when ready.";
+    if (type === "popup_failed_to_open") return "Your browser blocked the Google sign-in window. Allow pop-ups and try again.";
+    if (type === "access_denied") return "Google sign-in was cancelled or access was denied. Try again when ready.";
+    return (err && (err.error_description || err.message)) || "Google sign-in could not start. Try again.";
+  }
+  function onTokenError(err) {
+    $("connect").disabled = PLACEHOLDER;
+    setGateStatus(friendlyAuthError(err), true);
+  }
+  function connect() {
+    if (PLACEHOLDER) return;
+    $("connect").disabled = true;
+    setGateStatus("Opening Google sign-in...", false);
+    ensureTokenClient().then(function (client) {
+      client.requestAccessToken({ prompt: "select_account" });
+    }).catch(function (err) {
+      $("connect").disabled = false;
+      setGateStatus(friendlyAuthError(err), true);
+    });
+  }
+  function signOut() {
+    var token = state.token;
+    clearSession("Signed out.", false);
+    if (token && window.google && window.google.accounts && window.google.accounts.oauth2) {
+      try { window.google.accounts.oauth2.revoke(token, function () { return; }); } catch (err) { return; }
+    }
+  }
+  function apiFetch(url) {
+    return fetch(url, {
+      headers: { Authorization: "Bearer " + state.token },
+      cache: "no-store"
+    }).then(function (response) {
+      if (!response.ok) {
+        return response.json().catch(function () { return null; }).then(function (payload) {
+          var details = payload && payload.error;
+          var first = details && details.errors && details.errors[0];
+          var reason = (first && first.reason) || (details && details.status) || "";
+          var message = (details && details.message) || ("Google API request failed (" + response.status + ").");
+          var err = new Error(message);
+          err.code = response.status;
+          err.reason = reason;
+          throw err;
+        });
+      }
+      return response.json();
+    }, function () {
+      throw new Error("Network request failed. Check your connection and try again.");
+    });
+  }
+  function dataApi(path, params) {
+    var url = new URL(DATA_URL + path);
+    Object.keys(params || {}).forEach(function (key) {
+      var value = params[key];
+      if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+    });
+    return apiFetch(url.toString());
+  }
+  function friendlyError(err) {
+    if (!err) return "Something went wrong.";
+    if (err.code === 403 && /quota|rateLimit/i.test(err.reason || "")) return "Google's API quota was reached. Wait a while and try again.";
+    if (err.code === 403 && /accessNotConfigured|SERVICE_DISABLED/i.test(err.reason || "")) return "A required Google API is not enabled for this deployment.";
+    if (err.code === 403) return "This account cannot read the channel's content. Use an account that owns or manages the channel.";
+    if (err.code === 401) return "Your Google session expired. Connect again.";
+    if (err.code === 400) return err.message + " The selected channel may not expose this content.";
+    return err.message || "Could not load content.";
+  }
+
+  function fetchChannelProfile() {
+    return dataApi("channels", { part: "snippet,contentDetails", mine: "true" }).then(function (data) {
+      return (data.items && data.items[0]) || null;
+    });
+  }
+  function fetchPlaylistItems(playlistId, pageToken, rows) {
+    return dataApi("playlistItems", {
+      part: "contentDetails",
+      playlistId: playlistId,
+      maxResults: 50,
+      pageToken: pageToken || undefined
+    }).then(function (res) {
+      var all = rows.concat(res.items || []);
+      if (res.nextPageToken && all.length < 10000) return fetchPlaylistItems(playlistId, res.nextPageToken, all);
+      return all;
+    });
+  }
+  function fetchVideoDetails(entries, index, acc) {
+    var ids = entries.slice(index, index + 50).map(function (entry) {
+      return entry.contentDetails && entry.contentDetails.videoId;
+    }).filter(Boolean);
+    if (!ids.length) return Promise.resolve(acc);
+    return dataApi("videos", {
+      part: "snippet,contentDetails,status,liveStreamingDetails",
+      id: ids.join(",")
+    }).then(function (res) {
+      var all = acc.concat(res.items || []);
+      if (index + 50 < entries.length) return fetchVideoDetails(entries, index + 50, all);
+      return all;
+    });
+  }
+  function buildItems(resources) {
+    var now = Date.now();
+    var seen = {};
+    var list = [];
+    (resources || []).forEach(function (video) {
+      var id = String(video.id || "");
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      var snippet = video.snippet || {};
+      var status = video.status || {};
+      var details = video.contentDetails || {};
+      var live = video.liveStreamingDetails || {};
+      var liveState = String(snippet.liveBroadcastContent || "").toLowerCase();
+      var scheduledTime = status.publishAt || live.scheduledStartTime || "";
+      var rawTime = scheduledTime || snippet.publishedAt || "";
+      var scheduled = (!!scheduledTime && new Date(scheduledTime).getTime() > now) || liveState === "upcoming";
+      if (!scheduled && rawTime && new Date(rawTime).getTime() > now) scheduled = true;
+      var day = pacificDate(rawTime);
+      if (!day) return;
+      var seconds = durationSeconds(details.duration);
+      var type = liveState === "upcoming" || liveState === "live" ? "live" : (seconds > 0 && seconds <= 180 ? "short" : "video");
+      var privacy = String(status.privacyStatus || "public").toLowerCase();
+      var itemState = scheduled ? "scheduled" : (privacy === "private" ? "private" : "published");
+      var thumbs = snippet.thumbnails || {};
+      list.push({
+        id: id,
+        title: snippet.title || id,
+        day: day,
+        time: rawTime,
+        type: type,
+        state: itemState,
+        privacy: privacy,
+        seconds: seconds,
+        thumb: (thumbs.medium && thumbs.medium.url) || (thumbs.default && thumbs.default.url) || "",
+        url: "https://www.youtube.com/watch?v=" + encodeURIComponent(id)
+      });
+    });
+    list.sort(function (a, b) {
+      if (a.day === b.day) return String(a.time || "").localeCompare(String(b.time || ""));
+      return a.day < b.day ? 1 : (a.day > b.day ? -1 : 0);
+    });
+    return list;
+  }
+  function fetchLibrary() {
+    return fetchChannelProfile().then(function (channel) {
+      state.channel = channel;
+      renderAccount(channel);
+      var uploads = channel && channel.contentDetails && channel.contentDetails.relatedPlaylists && channel.contentDetails.relatedPlaylists.uploads;
+      if (!uploads) throw new Error("This channel does not expose an uploads playlist.");
+      return fetchPlaylistItems(uploads, null, []);
+    }).then(function (rows) {
+      return fetchVideoDetails(rows, 0, []);
+    }).then(function (videos) {
+      state.items = buildItems(videos);
+      return state.items;
+    });
+  }
+
+  function visibleItems() {
+    return state.items.filter(function (item) {
+      if (state.filter !== "all" && item.type !== state.filter) return false;
+      if (state.statusFilter !== "all" && item.state !== state.statusFilter) return false;
+      return true;
+    });
+  }
+  function cadenceOf(items) {
+    var seen = {};
+    var days = items.filter(function (item) { return item.state === "published" && item.day; }).map(function (item) { return item.day; });
+    var unique = days.filter(function (day) {
+      if (seen[day]) return false;
+      seen[day] = true;
+      return true;
+    }).sort();
+    var gaps = [];
+    for (var i = 1; i < unique.length; i += 1) {
+      var gap = dayDiff(unique[i - 1], unique[i]);
+      if (gap > 0 && gap <= 90) gaps.push(gap);
+    }
+    var counts = {};
+    unique.forEach(function (day) {
+      var weekday = weekdayOf(day);
+      counts[weekday] = (counts[weekday] || 0) + 1;
+    });
+    var bestWeekday = null;
+    var bestCount = 0;
+    Object.keys(counts).forEach(function (key) {
+      if (counts[key] > bestCount) {
+        bestCount = counts[key];
+        bestWeekday = Number(key);
+      }
+    });
+    return {
+      gap: gaps.length ? median(gaps) : null,
+      weekday: bestWeekday,
+      count: unique.length,
+      last: unique.length ? unique[unique.length - 1] : null
+    };
+  }
+  function openSlots(items, cadence) {
+    var occupied = {};
+    items.forEach(function (item) { occupied[item.day] = true; });
+    var step = Math.max(1, Math.round(cadence.gap || 7));
+    var start = todayKey();
+    var guard = 0;
+    if (cadence.weekday != null) {
+      while (weekdayOf(start) !== cadence.weekday && guard < 7) {
+        start = addDays(start, 1);
+        guard += 1;
+      }
+    }
+    var slots = [];
+    for (var i = 0; i < 90 && slots.length < 6; i += 1) {
+      var day = addDays(start, i * step);
+      if (!occupied[day] && day >= todayKey()) slots.push(day);
+    }
+    if (slots.length) return slots;
+    start = todayKey();
+    for (var j = 0; j < 90 && slots.length < 6; j += 1) {
+      var fallback = addDays(start, j);
+      if (!occupied[fallback]) slots.push(fallback);
+    }
+    return slots;
+  }
+  function renderKpis(items) {
+    var today = todayKey();
+    var upcoming = items.filter(function (item) { return item.state === "scheduled"; });
+    var next = upcoming.slice().sort(function (a, b) { return a.day < b.day ? -1 : (a.day > b.day ? 1 : 0); })[0];
+    var inWindow = upcoming.filter(function (item) { return item.day >= today && item.day <= addDays(today, 30); }).length;
+    var shortCount = items.filter(function (item) { return item.type === "short"; }).length;
+    var cadence = cadenceOf(items);
+    $("kpiUpcoming").textContent = String(upcoming.length);
+    $("kpiNext").textContent = next ? ("Next: " + fmtDate(next.day) + (next.time ? " " + fmtTime(next.time) : "")) : "No scheduled items exposed";
+    $("kpiWindow").textContent = String(inWindow);
+    $("kpiWindowSub").textContent = "scheduled items in 30 days";
+    $("kpiGap").textContent = cadence.gap != null ? (Math.round(cadence.gap * 10) / 10) + " d" : "-";
+    $("kpiCadence").textContent = cadence.weekday != null ? ("Typical day: " + DAY_NAMES[cadence.weekday]) : "Not enough history";
+    $("kpiLibrary").textContent = String(items.length);
+    $("kpiLibrarySub").textContent = shortCount + " shorts / " + (items.length - shortCount) + " long or live";
+    $("kpiLast").textContent = cadence.last ? fmtDate(cadence.last) : "-";
+  }
+  function renderCalendar(items) {
+    if (!state.month) state.month = todayKey().slice(0, 7);
+    $("monthLabel").textContent = monthName(state.month);
+    var first = state.month + "-01";
+    var start = addDays(first, -weekdayOf(first));
+    var byDay = {};
+    var today = todayKey();
+    items.forEach(function (item) {
+      if (!byDay[item.day]) byDay[item.day] = [];
+      byDay[item.day].push(item);
+    });
+    var html = "";
+    for (var i = 0; i < 42; i += 1) {
+      var day = addDays(start, i);
+      var classes = ["calendar-day"];
+      if (day.slice(0, 7) !== state.month) classes.push("other");
+      if (day === today) classes.push("today");
+      if (day === state.day) classes.push("selected");
+      var list = byDay[day] || [];
+      var pills = "";
+      list.slice(0, 3).forEach(function (item) {
+        pills += '<span class="cal-pill ' + item.type + " " + item.state + '" title="' + escapeHtml(item.title) + '">' + escapeHtml(shortTitle(item.title, 18)) + "</span>";
+      });
+      if (list.length > 3) pills += '<span class="more">+' + (list.length - 3) + "</span>";
+      html += '<button type="button" class="' + classes.join(" ") + '" data-day="' + day + '">' +
+        '<span class="calendar-date">' + Number(day.slice(8)) + "</span>" +
+        '<span class="calendar-items">' + pills + "</span></button>";
+    }
+    $("calendar").innerHTML = html;
+  }
+  function itemRowHtml(item) {
+    var badges = '<span class="badge ' + item.type + '">' + (item.type === "short" ? "Short" : (item.type === "live" ? "Live" : "Video")) + "</span>";
+    badges += '<span class="badge ' + item.state + '">' + (item.state === "scheduled" ? "Scheduled" : (item.state === "private" ? "Private" : "Published")) + "</span>";
+    var thumb = item.thumb
+      ? '<img class="thumb" src="' + escapeHtml(item.thumb) + '" alt="" />'
+      : '<span class="thumb"></span>';
+    var meta = fmtDateFull(item.day) + (item.time ? " · " + fmtTime(item.time) : "") + (item.seconds ? " · " + fmtDuration(item.seconds) : "");
+    return '<div class="tl-item">' +
+      '<span class="tl-date"><strong>' + Number(item.day.slice(8)) + "</strong><span>" + new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(new Date(item.day + "T12:00:00Z")) + "</span></span>" +
+      thumb +
+      '<span class="tl-title"><strong>' + escapeHtml(item.title) + '</strong><span class="tl-meta">' + badges + "<span>" + escapeHtml(meta) + "</span></span></span>" +
+      '<a class="tl-link" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">Open</a></div>';
+  }
+  function renderDay(items) {
+    state.day = state.day || todayKey();
+    $("dayTitle").textContent = fmtDateFull(state.day) + (state.day === todayKey() ? " · Today" : "");
+    var list = items.filter(function (item) { return item.day === state.day; });
+    if (!list.length) {
+      $("dayList").innerHTML = '<div class="empty">No uploads or scheduled videos on this day.</div>';
+      return;
+    }
+    $("dayList").innerHTML = list.map(itemRowHtml).join("");
+  }
+  function renderSlots(items) {
+    var slots = openSlots(items, cadenceOf(items));
+    if (!slots.length) {
+      $("slotList").innerHTML = '<div class="empty">Not enough upload history yet.</div>';
+      return;
+    }
+    $("slotList").innerHTML = slots.map(function (day, index) {
+      return '<button type="button" class="slot" data-day="' + day + '"><strong>' + fmtDateFull(day) + "</strong><span>" + (index === 0 ? "Best next slot" : "Open slot") + "</span></button>";
+    }).join("");
+  }
+  function renderTimeline(items) {
+    var upcoming = items.filter(function (item) { return item.state === "scheduled"; }).slice().sort(function (a, b) {
+      return a.day < b.day ? -1 : (a.day > b.day ? 1 : 0);
+    });
+    var history = items.filter(function (item) { return item.state !== "scheduled"; });
+    var shown = history.slice(0, state.limit);
+    var html = '<div class="tl-group"><div class="group-title">Upcoming (' + upcoming.length + ")</div>";
+    html += upcoming.length ? upcoming.slice(0, 30).map(itemRowHtml).join("") : '<div class="empty">No scheduled items exposed by YouTube.</div>';
+    html += "</div>";
+    html += '<div class="tl-group"><div class="group-title">Upload history (' + history.length + ")</div>";
+    html += shown.length ? shown.map(itemRowHtml).join("") : '<div class="empty">No published items found.</div>';
+    if (history.length > state.limit) {
+      html += '<div class="more-row"><button type="button" class="ghost" id="moreTimeline">Show more (' + (history.length - state.limit) + ")</button></div>";
+    }
+    html += "</div>";
+    $("timeline").innerHTML = html;
+    var more = $("moreTimeline");
+    if (more) {
+      more.addEventListener("click", function () {
+        state.limit += 200;
+        renderTimeline(visibleItems());
+      });
+    }
+  }
+  function renderAll() {
+    var items = visibleItems();
+    renderKpis(items);
+    renderCalendar(items);
+    renderDay(items);
+    renderSlots(items);
+    renderTimeline(items);
+  }
+  function load() {
+    if (!state.token) return;
+    var seq = state.seq + 1;
+    state.seq = seq;
+    $("refresh").disabled = true;
+    hideError();
+    setStatus("Loading uploads from YouTube...", false);
+    fetchLibrary().then(function () {
+      if (seq !== state.seq) return;
+      state.limit = 100;
+      state.day = todayKey();
+      state.month = state.day.slice(0, 7);
+      renderAll();
+      setStatus("Updated " + new Date().toLocaleTimeString() + " · " + state.items.length + " items", false);
+    }).catch(function (err) {
+      if (seq !== state.seq) return;
+      if (err && err.code === 401) {
+        clearSession("Your Google session expired. Connect again to continue.", true);
+        return;
+      }
+      showError(friendlyError(err));
+      setStatus("Could not load content.", true);
+    }).then(function () {
+      if (seq === state.seq) $("refresh").disabled = false;
+    });
+  }
+
+  function init() {
+    $("connect").disabled = PLACEHOLDER;
+    if (PLACEHOLDER) {
+      $("configNotice").textContent = "Add the Web OAuth client ID to web/config.js before connecting.";
+      $("configNotice").hidden = false;
+    }
+    $("connect").addEventListener("click", connect);
+    $("signOut").addEventListener("click", signOut);
+    $("refresh").addEventListener("click", load);
+    $("contentFilter").addEventListener("change", function () {
+      state.filter = this.value;
+      state.limit = 100;
+      renderAll();
+    });
+    $("statusFilter").addEventListener("change", function () {
+      state.statusFilter = this.value;
+      state.limit = 100;
+      renderAll();
+    });
+    $("prevMonth").addEventListener("click", function () {
+      state.month = shiftMonth(state.month, -1);
+      renderCalendar(visibleItems());
+    });
+    $("nextMonth").addEventListener("click", function () {
+      state.month = shiftMonth(state.month, 1);
+      renderCalendar(visibleItems());
+    });
+    $("todayMonth").addEventListener("click", function () {
+      state.month = todayKey().slice(0, 7);
+      state.day = todayKey();
+      renderAll();
+    });
+    $("calendar").addEventListener("click", function (event) {
+      var button = event.target.closest("[data-day]");
+      if (!button) return;
+      state.day = button.getAttribute("data-day");
+      renderAll();
+    });
+    $("slotList").addEventListener("click", function (event) {
+      var button = event.target.closest("[data-day]");
+      if (!button) return;
+      var day = button.getAttribute("data-day");
+      state.day = day;
+      state.month = day.slice(0, 7);
+      renderAll();
+    });
+    if (!PLACEHOLDER && readStoredToken()) {
+      armTokenTimer();
+      enterApp();
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
