@@ -1,4 +1,4 @@
-# Channel Growth
+# ChannelGrowth
 
 A browser-only analytics dashboard for viewing private analytics for a YouTube channel. Any Google account that manages a channel can connect it and see views, watch time, net subscriber contribution, and top videos for that channel. There is no backend: analytics are fetched directly from Google into the browser tab, and the site stores nothing on a server.
 
