@@ -4,6 +4,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 WEB = BASE / "web"
+ASSETS = BASE / "assets"
 DIST = BASE / "dist"
 
 REQUIRED = (
@@ -52,6 +53,10 @@ def main():
     shutil.copy2(WEB / "privacy.html", DIST / "privacy.html")
     shutil.copy2(WEB / "terms.html", DIST / "terms.html")
     shutil.copy2(WEB / "config.js", DIST / "config.js")
+    (DIST / "assets").mkdir()
+    shutil.copy2(ASSETS / "channel-growth-logo.svg", DIST / "assets" / "channel-growth-logo.svg")
+    shutil.copy2(ASSETS / "channel-growth-logo-120.png", DIST / "assets" / "channel-growth-logo-120.png")
+    shutil.copy2(ASSETS / "favicon.ico", DIST / "favicon.ico")
     shutil.copytree(WEB / "vendor", DIST / "vendor")
     (DIST / ".nojekyll").write_text("", encoding="utf-8")
 

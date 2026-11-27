@@ -23,6 +23,9 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 
 <img width="1104" height="677" alt="image" src="https://github.com/user-attachments/assets/bf00709c-388a-4e27-be6c-1dfc3860d4a4" />
 
+<img width="1323" height="942" alt="image" src="https://github.com/user-attachments/assets/6f4aa509-2946-4079-8666-0873e6a82bcc" />
+
+
 ## How it works
 
 1. The site is a static app hosted on GitHub Pages.

@@ -6,7 +6,9 @@
 <meta name="description" content="Private, browser-only analytics for your YouTube channel: views, watch time, subscriber growth, and top videos." />
 <meta name="color-scheme" content="dark" />
 <title>Channel Growth - Private channel analytics</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f1115'/%3E%3Cpath d='M38 28l30 22-30 22z' fill='%23ff0033'/%3E%3C/svg%3E" />
+<link rel="icon" href="assets/channel-growth-logo.svg?v=2" type="image/svg+xml" sizes="any" />
+<link rel="alternate icon" href="assets/channel-growth-logo-120.png?v=2" type="image/png" sizes="120x120" />
+<link rel="shortcut icon" href="favicon.ico?v=2" />
 <script src="vendor/chart.umd.min.js"></script>
 <script src="config.js"></script>
 <style>
@@ -74,15 +76,11 @@
     text-decoration: none;
   }
   .brand-mark {
-    display: grid;
-    place-items: center;
+    display: block;
     width: 34px;
     height: 34px;
     border-radius: 10px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 13px;
-    padding-left: 2px;
+    object-fit: contain;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(255, 0, 51, 0.25);
   }
   .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
@@ -598,7 +596,7 @@
 <header class="topbar">
   <div class="topbar-left">
     <a class="brand" href="" id="brandRefresh" aria-label="Refresh dashboard">
-      <span class="brand-mark" aria-hidden="true">&#9654;</span>
+      <img class="brand-mark" src="assets/channel-growth-logo.svg" alt="" aria-hidden="true" />
       <span class="brand-text">
         <strong>Channel Growth</strong>
         <small>YouTube Analytics</small>
