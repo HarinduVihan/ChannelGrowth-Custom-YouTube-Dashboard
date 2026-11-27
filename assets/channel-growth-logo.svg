@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">Channel Growth</title>
+  <title id="title">ChannelGrowth</title>
   <desc id="desc">A play triangle with rising growth bars on a dark rounded square.</desc>
   <rect width="512" height="512" rx="112" fill="#0f1115"/>
   <rect x="18" y="18" width="476" height="476" rx="98" fill="none" stroke="#ff0033" stroke-width="8" opacity="0.85"/>
