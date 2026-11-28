@@ -818,6 +818,34 @@
       return all;
     });
   }
+  function fetchOwnVideos(pageToken, rows) {
+    return dataApi("search", {
+      part: "id",
+      forMine: "true",
+      type: "video",
+      order: "date",
+      maxResults: 50,
+      pageToken: pageToken || undefined
+    }).then(function (res) {
+      var found = (res.items || []).map(function (item) {
+        return { contentDetails: { videoId: item.id && item.id.videoId } };
+      }).filter(function (entry) { return !!entry.contentDetails.videoId; });
+      var all = rows.concat(found);
+      if (res.nextPageToken && all.length < 200) return fetchOwnVideos(res.nextPageToken, all);
+      return all;
+    });
+  }
+  function mergeVideoEntries(entries) {
+    var seen = {};
+    var out = [];
+    (entries || []).forEach(function (entry) {
+      var id = entry && entry.contentDetails && entry.contentDetails.videoId;
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      out.push(entry);
+    });
+    return out;
+  }
   function fetchVideoDetails(entries, index, acc) {
     var ids = entries.slice(index, index + 50).map(function (entry) {
       return entry.contentDetails && entry.contentDetails.videoId;
@@ -881,7 +909,12 @@
       renderAccount(channel);
       var uploads = channel && channel.contentDetails && channel.contentDetails.relatedPlaylists && channel.contentDetails.relatedPlaylists.uploads;
       if (!uploads) throw new Error("This channel does not expose an uploads playlist.");
-      return fetchPlaylistItems(uploads, null, []);
+      return Promise.all([
+        fetchPlaylistItems(uploads, null, []),
+        fetchOwnVideos(null, []).catch(function () { return []; })
+      ]);
+    }).then(function (results) {
+      return mergeVideoEntries(results[0].concat(results[1]));
     }).then(function (rows) {
       return fetchVideoDetails(rows, 0, []);
     }).then(function (videos) {
@@ -979,7 +1012,11 @@
     var start = addDays(first, -weekdayOf(first));
     var byDay = {};
     var today = todayKey();
-    items.forEach(function (item) {
+    items.slice().sort(function (a, b) {
+      if (a.day !== b.day) return a.day < b.day ? 1 : -1;
+      if (a.state !== b.state) return a.state === "scheduled" ? -1 : 1;
+      return String(a.time || "").localeCompare(String(b.time || ""));
+    }).forEach(function (item) {
       if (!byDay[item.day]) byDay[item.day] = [];
       byDay[item.day].push(item);
     });
@@ -992,10 +1029,10 @@
       if (day === state.day) classes.push("selected");
       var list = byDay[day] || [];
       var pills = "";
-      list.slice(0, 3).forEach(function (item) {
+      list.slice(0, 4).forEach(function (item) {
         pills += '<span class="cal-pill ' + item.type + " " + item.state + '" title="' + escapeHtml(item.title) + '">' + escapeHtml(shortTitle(item.title, 18)) + "</span>";
       });
-      if (list.length > 3) pills += '<span class="more">+' + (list.length - 3) + "</span>";
+      if (list.length > 4) pills += '<span class="more">+' + (list.length - 4) + "</span>";
       html += '<button type="button" class="' + classes.join(" ") + '" data-day="' + day + '">' +
         '<span class="calendar-date">' + Number(day.slice(8)) + "</span>" +
         '<span class="calendar-items">' + pills + "</span></button>";
