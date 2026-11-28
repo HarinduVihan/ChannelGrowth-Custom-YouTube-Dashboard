@@ -871,23 +871,16 @@
     return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
-  function pacificDate(value) {
+  function localDate(value) {
     var date = value instanceof Date ? value : new Date(value);
     if (isNaN(date.getTime())) return "";
-    var parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Los_Angeles",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(date);
-    var map = {};
-    parts.forEach(function (part) {
-      if (part.type !== "literal") map[part.type] = part.value;
-    });
-    return map.year + "-" + map.month + "-" + map.day;
+    var year = String(date.getFullYear());
+    var month = String(date.getMonth() + 1).padStart(2, "0");
+    var day = String(date.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
-  function pacificToday() {
-    return pacificDate(new Date());
+  function localToday() {
+    return localDate(new Date());
   }
   function addDays(isoDate, days) {
     var d = new Date(isoDate + "T12:00:00Z");
@@ -983,8 +976,8 @@
   }
   function applyChannelStart(channel) {
     var published = channel && channel.snippet && channel.snippet.publishedAt;
-    var start = pacificDate(published);
-    var end = $("endDate").value || pacificToday();
+    var start = localDate(published);
+    var end = $("endDate").value || localToday();
     if (start && start <= end) {
       $("startDate").value = start;
     }
@@ -2432,7 +2425,7 @@
     });
   }
   function applyPreset(days, shouldLoad) {
-    var end = pacificToday();
+    var end = localToday();
     var start = addDays(end, -(Number(days) - 1));
     $("startDate").value = start;
     $("endDate").value = end;
@@ -2447,7 +2440,7 @@
   }
 
   function init() {
-    var today = pacificToday();
+    var today = localToday();
     $("startDate").max = today;
     $("endDate").max = today;
     applyPreset(90, false);
