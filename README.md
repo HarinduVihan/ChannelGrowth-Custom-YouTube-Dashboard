@@ -37,6 +37,7 @@ A local dashboard for exploring how individual YouTube videos contribute to a ch
 ## Features
 
 - Google sign-in with read-only access to the user's own channel (`channel==MINE`)
+- Animated ChannelGrowth welcome screens on Analytics and Content with feature highlights, trust copy, privacy/terms links, and Google sign-in
 - Dashboard layout with KPI cards for the selected metric, videos tracked, days, data through, and subscribers
 - Global Views/Watch time/Subscribers metric, All/Videos/Shorts content filter, and Top 5/10/15/20 video selector
 - Subscribers metric is net subscribers (`subscribersGained - subscribersLost`) and can go negative
