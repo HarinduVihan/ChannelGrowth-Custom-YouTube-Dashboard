@@ -454,7 +454,7 @@
     <section class="card calendar-card">
       <div class="section-head">
         <h2>Calendar</h2>
-        <span>Click a day to inspect it</span>
+        <span>Click a day to inspect it · Times in your local timezone</span>
       </div>
       <div class="weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
       <div class="calendar" id="calendar"></div>
@@ -532,22 +532,15 @@
     var limit = max || 30;
     return text.length > limit ? text.slice(0, limit - 3) + "..." : text;
   }
-  function pacificDate(value) {
+  function localDate(value) {
     var date = value instanceof Date ? value : new Date(value);
     if (isNaN(date.getTime())) return "";
-    var parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Los_Angeles",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(date);
-    var map = {};
-    parts.forEach(function (part) {
-      if (part.type !== "literal") map[part.type] = part.value;
-    });
-    return map.year + "-" + map.month + "-" + map.day;
+    var year = String(date.getFullYear());
+    var month = String(date.getMonth() + 1).padStart(2, "0");
+    var day = String(date.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
-  function todayKey() { return pacificDate(new Date()); }
+  function todayKey() { return localDate(new Date()); }
   function addDays(isoDate, days) {
     if (!isoDate) return "";
     var d = new Date(isoDate + "T12:00:00Z");
@@ -575,9 +568,7 @@
     if (!value) return "";
     var date = new Date(value);
     if (isNaN(date.getTime())) return "";
-    return new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit"
-    }).format(date);
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
   }
   function durationSeconds(value) {
     var match = String(value || "").match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
@@ -827,6 +818,34 @@
       return all;
     });
   }
+  function fetchOwnVideos(pageToken, rows) {
+    return dataApi("search", {
+      part: "id",
+      forMine: "true",
+      type: "video",
+      order: "date",
+      maxResults: 50,
+      pageToken: pageToken || undefined
+    }).then(function (res) {
+      var found = (res.items || []).map(function (item) {
+        return { contentDetails: { videoId: item.id && item.id.videoId } };
+      }).filter(function (entry) { return !!entry.contentDetails.videoId; });
+      var all = rows.concat(found);
+      if (res.nextPageToken && all.length < 200) return fetchOwnVideos(res.nextPageToken, all);
+      return all;
+    });
+  }
+  function mergeVideoEntries(entries) {
+    var seen = {};
+    var out = [];
+    (entries || []).forEach(function (entry) {
+      var id = entry && entry.contentDetails && entry.contentDetails.videoId;
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      out.push(entry);
+    });
+    return out;
+  }
   function fetchVideoDetails(entries, index, acc) {
     var ids = entries.slice(index, index + 50).map(function (entry) {
       return entry.contentDetails && entry.contentDetails.videoId;
@@ -858,7 +877,7 @@
       var rawTime = scheduledTime || snippet.publishedAt || "";
       var scheduled = (!!scheduledTime && new Date(scheduledTime).getTime() > now) || liveState === "upcoming";
       if (!scheduled && rawTime && new Date(rawTime).getTime() > now) scheduled = true;
-      var day = pacificDate(rawTime);
+      var day = localDate(rawTime);
       if (!day) return;
       var seconds = durationSeconds(details.duration);
       var type = liveState === "upcoming" || liveState === "live" ? "live" : (seconds > 0 && seconds <= 180 ? "short" : "video");
@@ -890,7 +909,12 @@
       renderAccount(channel);
       var uploads = channel && channel.contentDetails && channel.contentDetails.relatedPlaylists && channel.contentDetails.relatedPlaylists.uploads;
       if (!uploads) throw new Error("This channel does not expose an uploads playlist.");
-      return fetchPlaylistItems(uploads, null, []);
+      return Promise.all([
+        fetchPlaylistItems(uploads, null, []),
+        fetchOwnVideos(null, []).catch(function () { return []; })
+      ]);
+    }).then(function (results) {
+      return mergeVideoEntries(results[0].concat(results[1]));
     }).then(function (rows) {
       return fetchVideoDetails(rows, 0, []);
     }).then(function (videos) {
@@ -988,7 +1012,11 @@
     var start = addDays(first, -weekdayOf(first));
     var byDay = {};
     var today = todayKey();
-    items.forEach(function (item) {
+    items.slice().sort(function (a, b) {
+      if (a.day !== b.day) return a.day < b.day ? 1 : -1;
+      if (a.state !== b.state) return a.state === "scheduled" ? -1 : 1;
+      return String(a.time || "").localeCompare(String(b.time || ""));
+    }).forEach(function (item) {
       if (!byDay[item.day]) byDay[item.day] = [];
       byDay[item.day].push(item);
     });
@@ -1001,10 +1029,10 @@
       if (day === state.day) classes.push("selected");
       var list = byDay[day] || [];
       var pills = "";
-      list.slice(0, 3).forEach(function (item) {
+      list.slice(0, 4).forEach(function (item) {
         pills += '<span class="cal-pill ' + item.type + " " + item.state + '" title="' + escapeHtml(item.title) + '">' + escapeHtml(shortTitle(item.title, 18)) + "</span>";
       });
-      if (list.length > 3) pills += '<span class="more">+' + (list.length - 3) + "</span>";
+      if (list.length > 4) pills += '<span class="more">+' + (list.length - 4) + "</span>";
       html += '<button type="button" class="' + classes.join(" ") + '" data-day="' + day + '">' +
         '<span class="calendar-date">' + Number(day.slice(8)) + "</span>" +
         '<span class="calendar-items">' + pills + "</span></button>";
